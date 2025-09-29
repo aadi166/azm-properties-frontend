@@ -7,6 +7,8 @@ const DeveloperManagement = () => {
   const [showForm, setShowForm] = useState(false)
   const [editingDeveloper, setEditingDeveloper] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [projectsList, setProjectsList] = useState([])
+  const [selectedProjectIds, setSelectedProjectIds] = useState([])
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -33,7 +35,19 @@ const DeveloperManagement = () => {
 
   useEffect(() => {
     fetchDevelopers()
+    fetchProjects()
   }, [])
+
+  const fetchProjects = async () => {
+    try {
+      const res = await apiService.getProjects({ limit: 1000 })
+      const data = res?.data || []
+      setProjectsList(Array.isArray(data) ? data : [])
+    } catch (err) {
+      console.error('Failed to fetch projects for developer form:', err)
+      setProjectsList([])
+    }
+  }
 
   const fetchDevelopers = async () => {
     try {
@@ -95,16 +109,24 @@ const DeveloperManagement = () => {
       // Prepare form data
       const submitData = new FormData()
       
-      // Add basic fields
-      submitData.append('name', formData.name)
-      submitData.append('description', formData.description)
-      submitData.append('established_year', formData.established_year)
-      submitData.append('about', formData.about)
-      submitData.append('website', formData.website)
+  // Add basic fields
+  // Per backend contract: treat `about` form field as the developer `name` when sending to API
+  const apiName = formData.about && formData.about.trim() ? formData.about : formData.name
+  submitData.append('name', apiName)
+  submitData.append('description', formData.description)
+  submitData.append('established_year', formData.established_year)
+  // Keep about locally for backward compatibility but do not send it separately as API expects 'name'
+  submitData.append('website', formData.website)
       
       // Add nested objects as JSON strings
       submitData.append('projects_count', JSON.stringify(formData.projects_count))
       submitData.append('contact_info', JSON.stringify(formData.contact_info))
+
+      // Include selected project ids (both as array JSON and as repeated fields 'projects[]')
+      if (selectedProjectIds && Array.isArray(selectedProjectIds) && selectedProjectIds.length > 0) {
+        submitData.append('projects', JSON.stringify(selectedProjectIds))
+        selectedProjectIds.forEach(pid => submitData.append('projects[]', pid))
+      }
       
       // Add backward compatibility fields
       submitData.append('email', formData.email || formData.contact_info.email)
@@ -139,6 +161,8 @@ const DeveloperManagement = () => {
         
         // Refresh the developers list
         await fetchDevelopers()
+        // clear selected projects after successful save
+        setSelectedProjectIds([])
       } else {
         const errorMessage = response?.message || 'Failed to save developer'
         toast.error(errorMessage)
@@ -155,7 +179,8 @@ const DeveloperManagement = () => {
       name: developer.name,
       description: developer.description,
       established_year: developer.established_year || '',
-      about: developer.about || '',
+      // Map stored developer.name into about field for editing (treat `about` as name)
+      about: developer.name || developer.about || '',
       projects_count: developer.projects_count || {
         total: 0,
         completed: 0,
@@ -174,6 +199,19 @@ const DeveloperManagement = () => {
       mobile_no: developer.mobile_no || '', // backward compatibility
       address: developer.address || '' // backward compatibility
     })
+    // Prefill selected projects from developer record if available
+    const existingProjectIds = []
+    if (Array.isArray(developer.projects)) {
+      developer.projects.forEach(p => {
+        if (typeof p === 'string') existingProjectIds.push(p)
+        else if (p && (p._id || p.id)) existingProjectIds.push(p._id || p.id)
+      })
+    } else if (Array.isArray(developer.project_ids)) {
+      developer.project_ids.forEach(pid => existingProjectIds.push(pid))
+    } else if (Array.isArray(developer.projects_ids)) {
+      developer.projects_ids.forEach(pid => existingProjectIds.push(pid))
+    }
+    setSelectedProjectIds(existingProjectIds)
     setShowForm(true)
   }
 
@@ -222,6 +260,7 @@ const DeveloperManagement = () => {
       mobile_no: '', // backward compatibility
       address: '' // backward compatibility
     })
+    setSelectedProjectIds([])
   }
 
   if (loading) {
@@ -254,15 +293,15 @@ const DeveloperManagement = () => {
       {/* Form Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-gray-800 rounded-2xl border border-yellow-400/30 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-gray-800 rounded-2xl border border-yellow-400/30 max-w-4xl w-full max-h-[90vh] admin-modal-panel">
             <div className="sticky top-0 bg-gray-800 p-6 border-b border-yellow-400/30 rounded-t-2xl">
               <h3 className="text-xl font-bold text-yellow-300">
                 {editingDeveloper ? 'Edit Developer' : 'Add New Developer'}
               </h3>
             </div>
-            
-            <div className="p-6">
-              <form onSubmit={handleSubmit} className="space-y-6">
+
+            <div className="modal-body">
+              <form id="developerForm" onSubmit={handleSubmit} className="space-y-6">
                 {/* Basic Information */}
                 <div className="border-b border-yellow-400/30 pb-6">
                   <h4 className="text-md font-medium text-yellow-300 mb-4">Basic Information</h4>
@@ -353,6 +392,52 @@ const DeveloperManagement = () => {
                       onChange={handleInputChange}
                       className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
                     />
+                  </div>
+                </div>
+
+                {/* Projects association */}
+                <div className="border-b border-yellow-400/30 pb-6">
+                  <h4 className="text-md font-medium text-yellow-300 mb-4">Associated Projects</h4>
+                  <p className="text-yellow-300/70 text-sm mb-3">Select projects this developer is involved in (multiple selection supported).</p>
+                  <div className="grid grid-cols-1 gap-2">
+                    <div className="flex items-center space-x-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedProjectIds(projectsList.map(p => p._id || p.id))}
+                        className="px-3 py-1 bg-yellow-400 text-gray-900 rounded-lg text-sm"
+                      >Select All</button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedProjectIds([])}
+                        className="px-3 py-1 bg-gray-700 text-yellow-300 rounded-lg text-sm border border-yellow-400/20"
+                      >Clear</button>
+                    </div>
+
+                    <div className="max-h-48 overflow-y-auto pr-2">
+                      {projectsList.length === 0 ? (
+                        <p className="text-yellow-300/60 text-sm">No projects available</p>
+                      ) : (
+                        projectsList.map(project => {
+                          const pid = project._id || project.id
+                          const label = project.title || project.name || pid
+                          const checked = selectedProjectIds.includes(pid)
+                          return (
+                            <label key={pid} className="flex items-center space-x-3 py-1">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={(e) => {
+                                  if (e.target.checked) setSelectedProjectIds(prev => Array.from(new Set([...prev, pid])))
+                                  else setSelectedProjectIds(prev => prev.filter(x => x !== pid))
+                                }}
+                                className="form-checkbox h-4 w-4 text-yellow-400 bg-gray-900 border-yellow-400/30"
+                              />
+                              <span className="text-yellow-100 text-sm">{label}</span>
+                            </label>
+                          )
+                        })
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -487,27 +572,29 @@ const DeveloperManagement = () => {
                   </div>
                 </div>
 
-                {/* Form Actions */}
-                <div className="flex items-center justify-end space-x-4 pt-6">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowForm(false)
-                      setEditingDeveloper(null)
-                      resetForm()
-                    }}
-                    className="px-6 py-3 border border-yellow-400/30 text-yellow-300 rounded-xl hover:bg-yellow-400/10 transition-all duration-300 backdrop-blur-sm"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-6 py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-gray-900 rounded-xl hover:from-yellow-300 hover:to-yellow-400 font-medium transition-all duration-300 shadow-lg hover:shadow-xl"
-                  >
-                    {editingDeveloper ? 'Update Developer' : 'Create Developer'}
-                  </button>
-                </div>
               </form>
+            </div>
+
+              <div className="modal-footer">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowForm(false)
+                  setEditingDeveloper(null)
+                  resetForm()
+                }}
+                className="px-6 py-3 border border-yellow-400/30 text-yellow-300 rounded-xl hover:bg-yellow-400/10 transition-all duration-300 backdrop-blur-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="developerForm"
+                onClick={() => { /* form submission handled by form's onSubmit */ }}
+                className="px-6 py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-gray-900 rounded-xl hover:from-yellow-300 hover:to-yellow-400 font-medium transition-all duration-300 shadow-lg hover:shadow-xl"
+              >
+                {editingDeveloper ? 'Update Developer' : 'Create Developer'}
+              </button>
             </div>
           </div>
         </div>

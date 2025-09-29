@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import apiService from '../services/api'
 import { toast } from 'react-hot-toast'
+import { useLocation } from 'react-router-dom'
 
 const Projects = () => {
   const [filter, setFilter] = useState('all')
@@ -10,6 +11,7 @@ const Projects = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [locationFilter, setLocationFilter] = useState('all')
   const [projectFilter, setProjectFilter] = useState('all')
+  const [developerFilter, setDeveloperFilter] = useState('all')
   const [bedroomsFilter, setBedroomsFilter] = useState('all')
   const [bathroomsFilter, setBathroomsFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -117,6 +119,12 @@ const Projects = () => {
 
   // Fetch properties from API
   useEffect(() => {
+    // If URL contains developer query param, set developerFilter
+    const params = new URLSearchParams(window.location.search)
+    const dev = params.get('developer')
+    if (dev) {
+      setDeveloperFilter(decodeURIComponent(dev))
+    }
     const fetchProperties = async () => {
       try {
         setLoading(true)
@@ -176,7 +184,8 @@ const Projects = () => {
     const offPlanMatch = property.category === 'off-plan'
     const typeMatch = filter === 'all' || property.category === filter
     const locationMatch = locationFilter === 'all' || property.location === locationFilter
-    const projectMatch = projectFilter === 'all' || (property.projectName && property.projectName === projectFilter)
+  const projectMatch = projectFilter === 'all' || (property.projectName && property.projectName === projectFilter)
+  const developerMatch = developerFilter === 'all' || !developerFilter || (property.developer && property.developer.toLowerCase().includes(developerFilter.toLowerCase())) || (property.projectDeveloper && property.projectDeveloper.toLowerCase().includes(developerFilter.toLowerCase()))
     const bedroomsMatch = bedroomsFilter === 'all' || property.bedrooms === parseInt(bedroomsFilter)
     const bathroomsMatch = bathroomsFilter === 'all' || property.bathrooms === parseInt(bathroomsFilter)
     const statusMatch = statusFilter === 'all' || 
@@ -209,7 +218,7 @@ const Projects = () => {
       priceMatch = property.price > 10000000
     }
     
-    return offPlanMatch && typeMatch && locationMatch && projectMatch && bedroomsMatch && bathroomsMatch && statusMatch && offerTypeMatch && propertyTypeMatch && constructionStatusMatch && searchMatch && priceMatch
+    return offPlanMatch && typeMatch && locationMatch && projectMatch && developerMatch && bedroomsMatch && bathroomsMatch && statusMatch && offerTypeMatch && propertyTypeMatch && constructionStatusMatch && searchMatch && priceMatch
   }) : []
 
   // Apply sorting to filtered properties

@@ -88,6 +88,46 @@ html {
   padding: 0 1rem;
 }
 
+/* Admin modal / form improvements
+   - Ensure modal panels are column flex containers
+   - Make form body scrollable and keep action buttons sticky at the bottom
+*/
+.modal-content,
+.admin-modal-panel,
+.bg-gray-800.rounded-2xl {
+  display: flex;
+  flex-direction: column;
+  width: min(1200px, 96%);
+  max-height: 90vh;
+  overflow: hidden; /* hide overall scroll, we make body scrollable */
+}
+
+.modal-body {
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+.modal-footer,
+.form-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 50;
+  background: rgba(17,24,39,0.95);
+  border-top: 1px solid rgba(255,255,255,0.03);
+  padding: 0.75rem 1rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+/* Make sure inputs and textareas grow to fit modal width */
+.modal-body input,
+.modal-body select,
+.modal-body textarea {
+  width: 100% !important;
+  box-sizing: border-box;
+}
+
 /* Enhanced Animations for Contact Page */
 @keyframes float {
   0%, 100% {

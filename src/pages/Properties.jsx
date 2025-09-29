@@ -11,7 +11,9 @@ const Properties = () => {
   const [projectFilter, setProjectFilter] = useState('all')
   const [bedroomsFilter, setBedroomsFilter] = useState('all')
   const [bathroomsFilter, setBathroomsFilter] = useState('all')
+  const [priceRange, setPriceRange] = useState('all')
   const [constructionStatusFilter, setConstructionStatusFilter] = useState('all') // New Construction Status filter
+  const [statusFilter, setStatusFilter] = useState('all') // Ready Secondary / Offplan Secondary / all
   const [offerTypeFilter, setOfferTypeFilter] = useState('all')
   const [sortBy, setSortBy] = useState('default')
   const [selectedProperty, setSelectedProperty] = useState(null)
@@ -176,13 +178,38 @@ const Properties = () => {
     const bathroomsMatch = bathroomsFilter === 'all' || property.bathrooms === parseInt(bathroomsFilter)
     const constructionStatusMatch = constructionStatusFilter === 'all' || property.constructionStatus === constructionStatusFilter
     const offerTypeMatch = offerTypeFilter === 'all' || property.offerType === offerTypeFilter
+    // Price range matching (assumes property.price is numeric)
+    let priceNumeric = 0
+    if (property.price && typeof property.price === 'number') priceNumeric = property.price
+    else if (property.price && typeof property.price === 'string') {
+      const parsed = property.price.replace(/[^0-9.-]+/g, '')
+      priceNumeric = parsed ? Number(parsed) : 0
+    }
+    let priceMatch = true
+    if (priceRange === 'under-2m') {
+      priceMatch = priceNumeric > 0 ? priceNumeric < 2000000 : true
+    } else if (priceRange === '2m-5m') {
+      priceMatch = priceNumeric > 0 ? (priceNumeric >= 2000000 && priceNumeric <= 5000000) : true
+    } else if (priceRange === '5m-10m') {
+      priceMatch = priceNumeric > 0 ? (priceNumeric >= 5000000 && priceNumeric <= 10000000) : true
+    } else if (priceRange === 'over-10m') {
+      priceMatch = priceNumeric > 0 ? priceNumeric > 10000000 : true
+    }
+
+    // Status matching for Secondary Market (best-effort mapping)
+    let statusMatch = true
+    if (statusFilter === 'ready-secondary') {
+      statusMatch = (property.constructionStatus && property.constructionStatus.toLowerCase().includes('ready')) || (property.category && property.category.toLowerCase() === 'exclusive') || (property.status && property.status.toLowerCase().includes('ready'))
+    } else if (statusFilter === 'offplan-secondary') {
+      statusMatch = (property.category && property.category.toLowerCase() === 'off-plan') || (property.constructionStatus && property.constructionStatus.toLowerCase().includes('off')) || (property.status && property.status.toLowerCase().includes('off'))
+    }
     
     const searchMatch = searchQuery === '' || 
       (property.projectName && property.projectName.toLowerCase().includes(searchQuery.toLowerCase())) ||
       property.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       property.location.toLowerCase().includes(searchQuery.toLowerCase())
     
-    return exclusiveMatch && typeMatch && locationMatch && projectMatch && bedroomsMatch && bathroomsMatch && constructionStatusMatch && offerTypeMatch && searchMatch
+    return exclusiveMatch && typeMatch && locationMatch && projectMatch && bedroomsMatch && bathroomsMatch && constructionStatusMatch && offerTypeMatch && searchMatch && priceMatch && statusMatch
   }) : []
 
   // Apply sorting to filtered properties
@@ -369,6 +396,34 @@ const Properties = () => {
                     <option key="all-construction" value="all">All Status</option>
                     <option key="ready" value="ready">Ready</option>
                     <option key="in-construction" value="in-construction">In Construction</option>
+                  </select>
+                </div>
+
+                <div className="relative">
+                  <label className="block text-xs font-medium text-gold-400 mb-1">Status</label>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="luxury-select"
+                  >
+                    <option value="all">All</option>
+                    <option value="ready-secondary">Ready Secondary</option>
+                    <option value="offplan-secondary">Offplan Secondary</option>
+                  </select>
+                </div>
+
+                <div className="relative">
+                  <label className="block text-xs font-medium text-gold-400 mb-1">Price Range</label>
+                  <select
+                    value={priceRange}
+                    onChange={(e) => setPriceRange(e.target.value)}
+                    className="luxury-select"
+                  >
+                    <option value="all">All Prices</option>
+                    <option value="under-2m">Under AED 2M</option>
+                    <option value="2m-5m">AED 2M - 5M</option>
+                    <option value="5m-10m">AED 5M - 10M</option>
+                    <option value="over-10m">Over AED 10M</option>
                   </select>
                 </div>
 
@@ -703,32 +758,7 @@ const Properties = () => {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-20 bg-gradient-to-r from-dark-900 via-luxury-900 to-dark-900 text-white relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-luxury-600/20 to-gold-600/20"></div>
-        <div className="container mx-auto px-4 text-center relative">
-          <h2 className="text-5xl font-bold mb-6 font-serif bg-gradient-to-r from-white via-gold-200 to-white bg-clip-text text-transparent">
-            Discover Your Dream Property
-          </h2>
-          <p className="text-xl mb-12 max-w-3xl mx-auto text-gray-300 leading-relaxed">
-            Our luxury real estate experts are ready to help you find the perfect property that exceeds your expectations
-          </p>
-          <div className="flex flex-col sm:flex-row gap-6 justify-center">
-            <Link to="/contact" className="btn-primary btn-lg">
-              Schedule Consultation
-              <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-            </Link>
-            <a href="tel:+971-4-123-4567" className="btn-ghost btn-lg">
-              Call Now: +971 4 123 4567
-              <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-              </svg>
-            </a>
-          </div>
-        </div>
-      </section>
+      {/* CTA removed as requested */}
 
       {/* Property Detail Modal */}
       {isModalOpen && selectedProperty && (

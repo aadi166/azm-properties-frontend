@@ -62,7 +62,11 @@ const TrustedDevelopers = () => {
 
   // Handle developer card click
   const handleDeveloperClick = (partnerId) => {
-    navigate(`/partner/${partnerId}`)
+    // Navigate to Projects page and filter by developer name
+    // partnerId may map to an id in partners data, but here we use the developer name
+    const partner = developers.find(d => d.partnerId === partnerId || d.id === partnerId)
+    const developerName = partner ? partner.name : partnerId
+    navigate(`/projects?developer=${encodeURIComponent(developerName)}`)
   }
 
   return (

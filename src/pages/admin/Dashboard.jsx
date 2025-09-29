@@ -6,7 +6,6 @@ import ContactManagement from '../../components/admin/ContactManagement'
 import BlogManagement from '../../components/admin/BlogManagement'
 import DeveloperManagement from '../../components/admin/DeveloperManagement'
 import TestimonialManagement from '../../components/admin/TestimonialManagement'
-import WishlistManagement from '../../components/admin/WishlistManagement'
 import amzLogo from '../../assets/amz.logo.jpeg'
 
 const AdminDashboard = () => {
@@ -97,15 +96,7 @@ const AdminDashboard = () => {
         </svg>
       )
     },
-    { 
-      id: 'wishlist', 
-      label: 'Wishlist', 
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-        </svg>
-      )
-    }
+    // Wishlist tab removed from admin dashboard per request
   ]
 
   return (
@@ -202,7 +193,7 @@ const AdminDashboard = () => {
               {activeTab === 'blogs' && <BlogManagement />}
               {activeTab === 'developers' && <DeveloperManagement />}
               {activeTab === 'testimonials' && <TestimonialManagement />}
-              {activeTab === 'wishlist' && <WishlistManagement />}
+              {/* Wishlist removed from admin panel */}
             </div>
           </div>
         </div>

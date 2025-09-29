@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { toast } from 'react-hot-toast'
-import { apiService } from '../../services/api'
+import apiService from '../../services/api'
 
 // Import API config for base URL
 const API_CONFIG = {
@@ -109,24 +109,31 @@ const TestimonialManagement = () => {
         setShowForm(false)
         setEditingTestimonial(null)
         resetForm()
+        // notify other parts of the app to refresh testimonials
+        window.dispatchEvent(new CustomEvent('testimonialsUpdated'))
         fetchTestimonials()
       } else {
         toast.error(response?.message || 'Failed to save testimonial')
-        // Fallback: update local state
-        if (editingTestimonial) {
-          setTestimonials(prev => prev.map(testimonial => 
-            testimonial._id === editingTestimonial._id 
-              ? { ...editingTestimonial, ...formData, image: formData.image ? URL.createObjectURL(formData.image) : editingTestimonial.image }
-              : testimonial
-          ))
-        } else {
-          const newTestimonial = {
-            _id: Date.now().toString(),
-            ...formData,
-            image: formData.image ? URL.createObjectURL(formData.image) : null,
-            createdAt: new Date().toISOString()
+        // If an admin token exists, the API call should have been attempted and failing means request denied or server error.
+        // In that case, DO NOT create a local testimonial because it would be out-of-sync with the backend.
+        const adminToken = localStorage.getItem('adminToken') || localStorage.getItem('accessToken')
+        if (!adminToken) {
+          // Only fallback to local UI update when there is no admin token (offline/local mode)
+          if (editingTestimonial) {
+            setTestimonials(prev => prev.map(testimonial => 
+              testimonial._id === editingTestimonial._id 
+                ? { ...editingTestimonial, ...formData, image: formData.image ? URL.createObjectURL(formData.image) : editingTestimonial.image }
+                : testimonial
+            ))
+          } else {
+            const newTestimonial = {
+              _id: Date.now().toString(),
+              ...formData,
+              image: formData.image ? URL.createObjectURL(formData.image) : null,
+              createdAt: new Date().toISOString()
+            }
+            setTestimonials(prev => [newTestimonial, ...prev])
           }
-          setTestimonials(prev => [newTestimonial, ...prev])
         }
         setShowForm(false)
         setEditingTestimonial(null)
@@ -161,21 +168,35 @@ const TestimonialManagement = () => {
         setTestimonials(prev => prev.map(testimonial => 
           testimonial._id === testimonialId ? { ...testimonial, published: newStatus } : testimonial
         ))
+        // notify other parts of the app to refresh testimonials
+        window.dispatchEvent(new CustomEvent('testimonialsUpdated'))
       } else {
         toast.error(response?.message || 'Failed to update testimonial status')
-        // Fallback: update local state
-        setTestimonials(prev => prev.map(testimonial => 
-          testimonial._id === testimonialId ? { ...testimonial, published: newStatus } : testimonial
-        ))
+        const adminToken = localStorage.getItem('adminToken') || localStorage.getItem('accessToken')
+        if (!adminToken) {
+          // Only fallback locally when not authenticated
+          setTestimonials(prev => prev.map(testimonial => 
+            testimonial._id === testimonialId ? { ...testimonial, published: newStatus } : testimonial
+          ))
+        }
       }
     } catch (error) {
       console.error('Error updating testimonial status:', error)
+      // Help debugging: log message and any nested response text if present
+      try {
+        console.error('Error details:', error.message || error.toString())
+      } catch (e) {}
       toast.error('Error updating testimonial status')
-      // Fallback: update local state
-      const newStatus = !currentStatus
-      setTestimonials(prev => prev.map(testimonial => 
-        testimonial._id === testimonialId ? { ...testimonial, published: newStatus } : testimonial
-      ))
+      // If admin token exists, do NOT change local state (server-side operation failed)
+      const adminToken = localStorage.getItem('adminToken') || localStorage.getItem('accessToken')
+      if (!adminToken) {
+        const newStatus = !currentStatus
+        setTestimonials(prev => prev.map(testimonial => 
+          testimonial._id === testimonialId ? { ...testimonial, published: newStatus } : testimonial
+        ))
+        // notify other parts of the app to refresh testimonials
+        window.dispatchEvent(new CustomEvent('testimonialsUpdated'))
+      }
     }
   }
 
@@ -189,6 +210,8 @@ const TestimonialManagement = () => {
       
       if (response && response.success) {
         toast.success('Testimonial deleted successfully')
+        // notify other parts of the app to refresh testimonials
+        window.dispatchEvent(new CustomEvent('testimonialsUpdated'))
         fetchTestimonials()
       } else {
         toast.error(response?.message || 'Failed to delete testimonial')
@@ -198,8 +221,13 @@ const TestimonialManagement = () => {
     } catch (error) {
       console.error('Error deleting testimonial:', error)
       toast.error('Error deleting testimonial')
-      // Fallback: remove from local state
-      setTestimonials(prev => prev.filter(testimonial => testimonial._id !== testimonialId))
+      // If admin token exists, do NOT remove locally (server-side delete failed)
+      const adminToken = localStorage.getItem('adminToken') || localStorage.getItem('accessToken')
+      if (!adminToken) {
+        // Only remove locally in offline/local mode
+        setTestimonials(prev => prev.filter(testimonial => testimonial._id !== testimonialId))
+        window.dispatchEvent(new CustomEvent('testimonialsUpdated'))
+      }
     }
   }
 

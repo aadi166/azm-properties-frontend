@@ -233,11 +233,11 @@ const PropertyDetail = () => {
 
                 <div className="space-y-4">
                   <button
-                    onClick={() => navigate('/contact')}
-                    className="w-full btn-primary"
-                  >
-                    Schedule Viewing
-                  </button>
+                      onClick={() => navigate('/contact')}
+                      className="w-full btn-primary"
+                    >
+                      Contact Agent
+                    </button>
                   <button
                     onClick={() => window.open('tel:+971-4-123-4567')}
                     className="w-full btn-ghost"

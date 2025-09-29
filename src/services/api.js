@@ -10,7 +10,12 @@ const API_CONFIG = {
     BLOG_CREATE: '/api/blog/create',
     BLOG_READ: '/api/blog/read',
     TESTIMONIAL_CREATE: '/api/testimonial/create',
-    TESTIMONIAL_READ: '/api/testimonial/read'
+    TESTIMONIAL_READ: '/api/testimonial/read',
+    TESTIMONIAL_DELETE: '/api/testimonial/delete',
+    DEVELOPER_CREATE: '/api/developer/create',
+    DEVELOPER_DELETE: '/api/developer/delete'
+    ,PROJECT_READ: '/api/project/read',
+    DEVELOPER_READ: '/api/developer/read'
   }
 };
 
@@ -42,19 +47,20 @@ const initializeLocalStorage = () => {
     console.log('✅ Properties already exist in localStorage');
   }
   if (!localStorage.getItem(STORAGE_KEYS.PROJECTS)) {
-    console.log('💾 Storing projects to localStorage...');
-    localStorage.setItem(STORAGE_KEYS.PROJECTS, JSON.stringify(projects));
+    // Intentionally not seeding projects from static data to force API usage
+    console.log('ℹ️ Skipping seeding projects to localStorage to prefer API-backed data');
   } else {
     console.log('✅ Projects already exist in localStorage');
   }
   if (!localStorage.getItem(STORAGE_KEYS.BLOGS)) {
     localStorage.setItem(STORAGE_KEYS.BLOGS, JSON.stringify(blogs));
   }
+  // Do not seed partners (developers) into localStorage - prefer API-backed developers
   if (!localStorage.getItem(STORAGE_KEYS.PARTNERS)) {
-    localStorage.setItem(STORAGE_KEYS.PARTNERS, JSON.stringify(partners));
+    console.log('ℹ️ Skipping seeding partners to localStorage to prefer API-backed data');
   }
   if (!localStorage.getItem(STORAGE_KEYS.TESTIMONIALS)) {
-    localStorage.setItem(STORAGE_KEYS.TESTIMONIALS, JSON.stringify(testimonials));
+    console.log('ℹ️ Skipping seeding testimonials to localStorage to prefer API-backed data');
   }
   if (!localStorage.getItem(STORAGE_KEYS.CONTACTS)) {
     localStorage.setItem(STORAGE_KEYS.CONTACTS, JSON.stringify(contacts));
@@ -209,37 +215,55 @@ class StaticApiService {
 
   // Projects API methods
   async getProjects(filters = {}) {
-    await simulateDelay();
-    let projectsData = getFromStorage(STORAGE_KEYS.PROJECTS);
-    
-    console.log('🔍 getProjects called with filters:', filters);
-    console.log('📦 Raw projects data from storage:', projectsData);
-    console.log('📊 Projects count:', projectsData ? projectsData.length : 0);
-    
-    // Apply filters
-    if (filters.status && filters.status !== 'all') {
-      projectsData = projectsData.filter(p => p.status === filters.status);
+    // Call backend /api/project/read endpoint and return normalized projects
+    try {
+      const endpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.PROJECT_READ}`;
+      const resp = await fetch(endpoint, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}`);
+      }
+
+      const data = await resp.json();
+      const projectsRaw = data.response_data || data.projects || [];
+
+      // Normalize
+      const projects = (Array.isArray(projectsRaw) ? projectsRaw : []).map(p => ({
+        _id: p.id || p._id,
+        id: p.id || p._id,
+        title: p.title || p.name || '',
+        description: p.description || '',
+        priceRange: p.priceRange || p.price_range || { min: 0, max: 0 },
+        location: p.location || '',
+        status: p.status || 'upcoming',
+        category: p.category || '',
+        developer: p.developer || '',
+        keyHighlights: p.keyHighlights || p.key_highlights || [],
+        images: p.images || p.image || [],
+        createdAt: p.created_on ? new Date(p.created_on).toISOString() : (p.createdAt || new Date().toISOString()),
+        updatedAt: p.updated_on ? new Date(p.updated_on).toISOString() : (p.updatedAt || new Date().toISOString()),
+        ...p
+      }));
+
+      // apply filters client-side if provided
+      let filtered = projects;
+      if (filters.status && filters.status !== 'all') filtered = filtered.filter(p => p.status === filters.status);
+      if (filters.location && filters.location !== 'all') filtered = filtered.filter(p => p.location.toLowerCase().includes(filters.location.toLowerCase()));
+      if (filters.developer && filters.developer !== 'all') filtered = filtered.filter(p => p.developer.toLowerCase().includes(filters.developer.toLowerCase()));
+      if (filters.category && filters.category !== 'all') filtered = filtered.filter(p => p.category === filters.category);
+      if (filters.minPrice) filtered = filtered.filter(p => (p.priceRange?.min || 0) >= parseInt(filters.minPrice));
+      if (filters.maxPrice) filtered = filtered.filter(p => (p.priceRange?.max || 0) <= parseInt(filters.maxPrice));
+
+      return { data: filtered, success: true };
+    } catch (error) {
+      console.error('Error fetching projects from API:', error);
+      throw error;
     }
-    if (filters.location && filters.location !== 'all') {
-      projectsData = projectsData.filter(p => p.location.toLowerCase().includes(filters.location.toLowerCase()));
-    }
-    if (filters.developer && filters.developer !== 'all') {
-      projectsData = projectsData.filter(p => p.developer.toLowerCase().includes(filters.developer.toLowerCase()));
-    }
-    if (filters.category && filters.category !== 'all') {
-      projectsData = projectsData.filter(p => p.category === filters.category);
-    }
-    if (filters.minPrice) {
-      projectsData = projectsData.filter(p => p.priceRange.min >= parseInt(filters.minPrice));
-    }
-    if (filters.maxPrice) {
-      projectsData = projectsData.filter(p => p.priceRange.max <= parseInt(filters.maxPrice));
-    }
-    
-    console.log('✅ Filtered projects data:', projectsData);
-    console.log('📈 Final count:', projectsData ? projectsData.length : 0);
-    
-    return this.createResponse(projectsData);
   }
 
   async getProjectById(id) {
@@ -522,13 +546,61 @@ class StaticApiService {
   }
 
   async deleteBlog(id) {
+    // If admin token exists, call backend delete endpoint and do NOT fallback to localStorage on failure
+    const token = localStorage.getItem(STORAGE_KEYS.ADMIN_TOKEN) || localStorage.getItem('accessToken');
+    if (token) {
+      try {
+        const endpoint = `${API_CONFIG.BASE_URL}/api/blog/delete`;
+        // Try DELETE with JSON body (some servers accept body with DELETE)
+        let response = await fetch(endpoint, {
+          method: 'DELETE',
+          headers: {
+            'x-session-key': token,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({ id })
+        });
+
+        // If DELETE not allowed, try POST fallback
+        if (response.status === 405 || response.status === 404) {
+          try {
+            response = await fetch(endpoint, {
+              method: 'POST',
+              headers: {
+                'x-session-key': token,
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+              },
+              body: JSON.stringify({ id })
+            });
+          } catch (postErr) {
+            console.error('POST fallback for blog delete failed:', postErr);
+            throw postErr;
+          }
+        }
+
+        const data = await response.json().catch(() => null);
+        if (response.ok && data && (data.response_code === 200 || data.success === true)) {
+          return this.createResponse(null, true, data.response_message || 'Blog deleted successfully');
+        }
+
+        const errMsg = (data && (data.response_message || data.message)) || `HTTP ${response.status}`;
+        throw new Error(errMsg || 'Failed to delete blog');
+      } catch (error) {
+        console.error('Error deleting blog via API:', error);
+        throw error; // do not fallback to localStorage when admin token exists
+      }
+    }
+
+    // No token: fallback to localStorage
     await simulateDelay();
     const blogsData = getFromStorage(STORAGE_KEYS.BLOGS);
     const filteredBlogs = blogsData.filter(b => b._id !== id && b.id !== id);
-    
+
     if (filteredBlogs.length < blogsData.length) {
       saveToStorage(STORAGE_KEYS.BLOGS, filteredBlogs);
-      return this.createResponse(null, true, 'Blog deleted successfully');
+      return this.createResponse(null, true, 'Blog deleted successfully (local)');
     } else {
       throw new Error('Blog not found');
     }
@@ -612,36 +684,145 @@ class StaticApiService {
 
   // Developers API methods (New)
   async getDevelopers(filters = {}) {
-    await simulateDelay();
-    let developersData = getFromStorage(STORAGE_KEYS.PARTNERS); // Using same storage for now
-    
-    // Apply filters
-    if (filters.status && filters.status !== 'all') {
-      developersData = developersData.filter(p => p.status === filters.status);
+    // Call backend /api/developer/read and return developers (no local fallback)
+    try {
+      const endpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.DEVELOPER_READ}`;
+      const token = localStorage.getItem(STORAGE_KEYS.ADMIN_TOKEN) || localStorage.getItem('accessToken');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['x-session-key'] = token;
+
+      const resp = await fetch(endpoint, { method: 'GET', headers });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      const devsRaw = data.response_data || data.data || [];
+      const devs = (Array.isArray(devsRaw) ? devsRaw : []).map(d => ({
+        _id: d.id || d._id || d.developer_id,
+        id: d.developer_id || d.id || d._id,
+        name: d.name || d.about || '',
+        description: d.description || '',
+        established_year: d.established_year || '',
+        projects_count: d.projects_count || {},
+        contact_info: d.contact_info || {},
+        logo: d.logo || d.image || null,
+        cover_image: d.cover_image || null,
+        projects: d.projects || d.project_ids || [],
+        website: d.website || '',
+        createdAt: d.created_on ? new Date(d.created_on).toISOString() : (d.createdAt || new Date().toISOString()),
+        updatedAt: d.updated_on ? new Date(d.updated_on).toISOString() : (d.updatedAt || new Date().toISOString()),
+        ...d
+      }));
+
+      // apply limit filter
+      let filtered = devs;
+      if (filters.limit) filtered = filtered.slice(0, parseInt(filters.limit));
+      if (filters.status && filters.status !== 'all') filtered = filtered.filter(d => d.status === filters.status);
+
+      return { data: filtered, success: true };
+    } catch (error) {
+      console.error('Error fetching developers from API:', error);
+      throw error;
     }
-    if (filters.limit) {
-      developersData = developersData.slice(0, parseInt(filters.limit));
-    }
-    
-    return { data: developersData, success: true };
   }
 
   async getDeveloperById(id) {
-    await simulateDelay();
-    const developersData = getFromStorage(STORAGE_KEYS.PARTNERS); // Using same storage for now
-    const developer = developersData.find(p => p._id === id || p.id === id);
-    
-    if (developer) {
-      return this.createResponse(developer);
-    } else {
-      throw new Error('Developer not found');
+    try {
+      const endpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.DEVELOPER_READ}`;
+      const token = localStorage.getItem(STORAGE_KEYS.ADMIN_TOKEN) || localStorage.getItem('accessToken');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['x-session-key'] = token;
+
+      const resp = await fetch(`${endpoint}?id=${encodeURIComponent(id)}`, { method: 'GET', headers });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      const d = data.response_data || data.data || null;
+      if (!d) throw new Error('Developer not found');
+      const developer = {
+        _id: d.id || d._id || d.developer_id,
+        id: d.developer_id || d.id || d._id,
+        name: d.name || d.about || '',
+        description: d.description || '',
+        established_year: d.established_year || '',
+        projects_count: d.projects_count || {},
+        contact_info: d.contact_info || {},
+        logo: d.logo || d.image || null,
+        cover_image: d.cover_image || null,
+        projects: d.projects || d.project_ids || [],
+        website: d.website || '',
+        createdAt: d.created_on ? new Date(d.created_on).toISOString() : (d.createdAt || new Date().toISOString()),
+        updatedAt: d.updated_on ? new Date(d.updated_on).toISOString() : (d.updatedAt || new Date().toISOString()),
+        ...d
+      };
+      return this.createResponse(developer, true);
+    } catch (error) {
+      console.error('Error fetching developer by id from API:', error);
+      throw error;
     }
   }
 
   async createDeveloper(developerData) {
+    // If admin token exists, call backend create endpoint with FormData and x-session-key
+    const token = localStorage.getItem(STORAGE_KEYS.ADMIN_TOKEN) || localStorage.getItem('accessToken');
+    const endpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.DEVELOPER_CREATE}`;
+
+    if (token) {
+      try {
+        let formData = developerData;
+        if (!(developerData instanceof FormData)) {
+          formData = new FormData();
+          Object.keys(developerData).forEach(key => {
+            // For nested objects, stringify
+            const value = developerData[key];
+            if (value && typeof value === 'object' && !(value instanceof File)) {
+              formData.append(key, JSON.stringify(value));
+            } else if (value !== undefined && value !== null) {
+              formData.append(key, value);
+            }
+          });
+        }
+
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'x-session-key': token
+          },
+          body: formData
+        });
+
+        const data = await res.json().catch(() => null);
+        if (res.ok && data && (data.response_code === 200 || data.success === true)) {
+          const created = data.response_data || data;
+          // Normalize created developer
+          const developer = {
+            _id: created.id || created._id || created.developer_id || generateId(),
+            id: created.developer_id || created.id || created._id || generateId(),
+            name: created.name || created.about || created.title || '',
+            description: created.description || '',
+            established_year: created.established_year || '',
+            projects_count: created.projects_count || {},
+            contact_info: created.contact_info || {},
+            logo: created.logo || created.image || null,
+            cover_image: created.cover_image || null,
+            website: created.website || '',
+            createdAt: created.created_on ? new Date(created.created_on).toISOString() : new Date().toISOString(),
+            updatedAt: created.updated_on ? new Date(created.updated_on).toISOString() : new Date().toISOString()
+          };
+
+          return this.createResponse(developer, true, data.response_message || 'Developer created');
+        }
+
+        const errMsg = (data && (data.response_message || data.message)) || `HTTP ${res.status}`;
+        throw new Error(errMsg || 'Failed to create developer');
+      } catch (error) {
+        console.error('Error creating developer via API:', error);
+        // Do not fallback to localStorage when admin token exists
+        throw error;
+      }
+    }
+
+    // No token -> fallback to localStorage behavior
     await simulateDelay();
     const developersData = getFromStorage(STORAGE_KEYS.PARTNERS); // Using same storage for now
-    
+
     // Handle FormData
     let data = {};
     if (developerData instanceof FormData) {
@@ -653,7 +834,6 @@ class StaticApiService {
             data[key] = value;
           }
         } else if (key.startsWith('logo') || key.startsWith('cover_image') || key.startsWith('image')) {
-          // Handle file uploads - in real implementation, these would be uploaded to a server
           if (value instanceof File) {
             data[key] = URL.createObjectURL(value);
           }
@@ -672,11 +852,11 @@ class StaticApiService {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-    
+
     developersData.push(newDeveloper);
     saveToStorage(STORAGE_KEYS.PARTNERS, developersData);
-    
-    return this.createResponse(newDeveloper, true, 'Developer created successfully');
+
+    return this.createResponse(newDeveloper, true, 'Developer created successfully (local)');
   }
 
   async updateDeveloper(id, developerData) {
@@ -721,10 +901,54 @@ class StaticApiService {
   }
 
   async deleteDeveloper(id) {
+    // If admin token exists, call backend delete endpoint and do NOT fallback to localStorage on failure
+    const token = localStorage.getItem(STORAGE_KEYS.ADMIN_TOKEN) || localStorage.getItem('accessToken');
+    if (token) {
+      try {
+        const endpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.DEVELOPER_DELETE}`;
+
+        // Try DELETE with JSON body
+        let response = await fetch(endpoint, {
+          method: 'DELETE',
+          headers: {
+            'x-session-key': token,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({ id })
+        });
+
+        if (response.status === 405 || response.status === 404) {
+          // Try POST fallback
+          response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'x-session-key': token,
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({ id })
+          });
+        }
+
+        const data = await response.json().catch(() => null);
+        if (response.ok && data && (data.response_code === 200 || data.success === true)) {
+          return this.createResponse(null, true, data.response_message || 'Developer deleted');
+        }
+
+        const errMsg = (data && (data.response_message || data.message)) || `HTTP ${response.status}`;
+        throw new Error(errMsg || 'Failed to delete developer');
+      } catch (error) {
+        console.error('Error deleting developer via API:', error);
+        throw error; // do not fallback to localStorage when admin token exists
+      }
+    }
+
+    // No token: fallback to localStorage
     await simulateDelay();
     const developersData = getFromStorage(STORAGE_KEYS.PARTNERS); // Using same storage for now
     const filteredDevelopers = developersData.filter(p => p._id !== id && p.id !== id);
-    
+
     if (filteredDevelopers.length < developersData.length) {
       saveToStorage(STORAGE_KEYS.PARTNERS, filteredDevelopers);
       return this.createResponse(null, true, 'Developer deleted successfully');
@@ -879,8 +1103,9 @@ class StaticApiService {
       const response = await fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.TESTIMONIAL_CREATE}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`
-          // Don't set Content-Type for FormData, let the browser set it
+          // Backend expects the access token in x-session-key for multipart requests
+          'x-session-key': token
+          // Don't set Content-Type for FormData, let the browser set it (boundary)
         },
         body: formData
       });
@@ -916,14 +1141,133 @@ class StaticApiService {
   }
 
   async updateTestimonial(id, testimonialData) {
-    // Note: No specific update API endpoint provided, using localStorage for now
-    // TODO: Implement real API call when endpoint is available
-    console.log('Updating testimonial with localStorage (API endpoint not implemented):', id, testimonialData);
-    
+    // Try to call the backend update endpoint when an admin token exists.
+    // Support both JSON and FormData payloads. If no token, fallback to localStorage.
+    const token = localStorage.getItem(STORAGE_KEYS.ADMIN_TOKEN) || localStorage.getItem('accessToken');
+
+    // Build a list of candidate endpoints to try for update compatibility.
+    const baseCreate = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.TESTIMONIAL_CREATE}`;
+    const candidates = [
+      baseCreate.replace('/create', '/update'),
+      baseCreate.replace('/create', '/edit'),
+      baseCreate.replace('/create', '/status'),
+      baseCreate.replace('/create', '/publish'),
+      baseCreate // original create endpoint as a last resort (handled below too)
+    ];
+
+    // Helper to transform API response_data into internal testimonial shape
+    const transform = (data) => ({
+      _id: data.id || data._id || data.testimonial_id || id,
+      id: data.testimonial_id || data.id || data._id || id,
+      name: data.name,
+      email: data.email,
+      comments: data.comments,
+      designation: data.designation,
+      image: data.image,
+      image_url: data.image_url,
+      published: data.published !== false,
+      createdAt: data.created_on ? new Date(data.created_on).toISOString() : new Date().toISOString(),
+      updatedAt: data.updated_on ? new Date(data.updated_on).toISOString() : new Date().toISOString()
+    });
+
+    if (token) {
+      try {
+        let lastError = null;
+
+        // For each candidate endpoint, try PATCH then POST fallback
+        for (const ep of candidates) {
+          try {
+            // Determine body and headers for this attempt
+            let fetchOpts = {
+              method: 'PATCH',
+              headers: {
+                'x-session-key': token,
+                'Accept': 'application/json'
+              }
+            };
+
+            if (testimonialData instanceof FormData) {
+              // Make a fresh FormData for each attempt to avoid reusing the same instance
+              const fd = new FormData();
+              for (const [k, v] of testimonialData.entries()) fd.append(k, v);
+              // include id for compatibility
+              fd.append('id', id);
+              fetchOpts.body = fd;
+            } else {
+              fetchOpts.headers['Content-Type'] = 'application/json';
+              fetchOpts.body = JSON.stringify({ id, ...testimonialData });
+            }
+
+            let response = await fetch(ep, fetchOpts);
+
+            if (response.status === 405 || response.status === 404) {
+              // Try POST fallback to the same endpoint
+              const postOpts = { ...fetchOpts, method: 'POST' };
+              response = await fetch(ep, postOpts);
+            }
+
+            const data = await response.json().catch(() => null);
+            if (response.ok && data && (data.response_code === 200 || data.success === true)) {
+              const updated = data.response_data ? transform(data.response_data) : transform(testimonialData);
+              return this.createResponse(updated, true, data.response_message || 'Testimonial updated');
+            }
+
+            // not successful, remember last error and continue to next candidate
+            lastError = data && (data.response_message || data.message) ? new Error(data.response_message || data.message) : new Error(`HTTP ${response.status}`);
+          } catch (epErr) {
+            lastError = epErr;
+            console.warn('Attempt to update via', ep, 'failed:', epErr && epErr.message ? epErr.message : epErr);
+            // try next candidate
+          }
+        }
+
+        // If we reach here, all candidate endpoints failed. Try original create endpoint as a last resort (already included in candidates but ensure)
+        try {
+          const createEndpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.TESTIMONIAL_CREATE}`;
+          let createOpts = {
+            method: 'POST',
+            headers: {
+              'x-session-key': token,
+              'Accept': 'application/json'
+            }
+          };
+
+          if (testimonialData instanceof FormData) {
+            const fd2 = new FormData();
+            for (const [k, v] of testimonialData.entries()) fd2.append(k, v);
+            fd2.append('id', id);
+            createOpts.body = fd2;
+          } else {
+            createOpts.headers['Content-Type'] = 'application/json';
+            createOpts.body = JSON.stringify({ id, ...testimonialData });
+          }
+
+          const createResp = await fetch(createEndpoint, createOpts);
+          const createData = await createResp.json().catch(() => null);
+          if (createResp.ok && createData && (createData.response_code === 200 || createData.success === true)) {
+            const updated = createData.response_data ? transform(createData.response_data) : transform(testimonialData);
+            return this.createResponse(updated, true, createData.response_message || 'Testimonial updated via create endpoint');
+          }
+          lastError = createData && (createData.response_message || createData.message) ? new Error(createData.response_message || createData.message) : new Error(`HTTP ${createResp.status}`);
+        } catch (createFallbackErr) {
+          lastError = createFallbackErr;
+          console.warn('Create-endpoint fallback failed for update:', createFallbackErr);
+        }
+
+        // If all attempts failed, surface the last error
+        throw lastError || new Error('Failed to update testimonial');
+      } catch (error) {
+        console.error('Error updating testimonial via API:', error);
+        // Do not fallback to localStorage when admin token exists
+        throw error;
+      }
+    }
+
+    // No token -> fallback to localStorage update
     await simulateDelay();
     const testimonialsData = getFromStorage(STORAGE_KEYS.TESTIMONIALS);
     const index = testimonialsData.findIndex(t => t._id === id || t.id === id);
-    
+
     if (index !== -1) {
       // Handle FormData
       let data = {};
@@ -947,24 +1291,70 @@ class StaticApiService {
         updatedAt: new Date().toISOString()
       };
       saveToStorage(STORAGE_KEYS.TESTIMONIALS, testimonialsData);
-      return this.createResponse(testimonialsData[index], true, 'Testimonial updated successfully');
+      return this.createResponse(testimonialsData[index], true, 'Testimonial updated successfully (local)');
     } else {
       throw new Error('Testimonial not found');
     }
   }
 
   async deleteTestimonial(id) {
-    // Note: No specific delete API endpoint provided, using localStorage for now
-    // TODO: Implement real API call when endpoint is available
-    console.log('Deleting testimonial with localStorage (API endpoint not implemented):', id);
-    
+    // If an admin token exists, call backend using DELETE and do NOT fallback to localStorage on failure
+    const token = localStorage.getItem(STORAGE_KEYS.ADMIN_TOKEN) || localStorage.getItem('accessToken');
+    if (token) {
+      try {
+        // Use DELETE to the endpoint with id as query parameter (many servers accept query for DELETE)
+        const endpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.TESTIMONIAL_DELETE}?id=${encodeURIComponent(id)}`;
+        let response = await fetch(endpoint, {
+          method: 'DELETE',
+          headers: {
+            'x-session-key': token,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ id })
+        });
+
+        // If server does not allow DELETE (405), try POST fallback with JSON body { id }
+        if (response.status === 405) {
+          try {
+            const postEndpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.TESTIMONIAL_DELETE}`;
+            response = await fetch(postEndpoint, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-session-key': token,
+                'Accept': 'application/json'
+              },
+              body: JSON.stringify({ id })
+            });
+          } catch (postErr) {
+            console.error('POST fallback for delete failed:', postErr);
+            throw postErr;
+          }
+        }
+
+        const data = await response.json().catch(() => null);
+        if (response.ok && data && (data.response_code === 200 || data.success === true)) {
+          return this.createResponse(null, true, data.response_message || 'Testimonial deleted successfully');
+        }
+
+        // If the server returned a non-success response, surface the error to caller (no local fallback)
+        const errMsg = (data && (data.response_message || data.message)) || `HTTP ${response.status}`;
+        throw new Error(errMsg || 'Failed to delete testimonial');
+      } catch (error) {
+        console.error('Error deleting testimonial via API:', error);
+        throw error; // do not fallback to localStorage when admin token exists
+      }
+    }
+
+    // No admin token: fallback to localStorage
     await simulateDelay();
     const testimonialsData = getFromStorage(STORAGE_KEYS.TESTIMONIALS);
     const filteredTestimonials = testimonialsData.filter(t => t._id !== id && t.id !== id);
-    
+
     if (filteredTestimonials.length < testimonialsData.length) {
       saveToStorage(STORAGE_KEYS.TESTIMONIALS, filteredTestimonials);
-      return this.createResponse(null, true, 'Testimonial deleted successfully');
+      return this.createResponse(null, true, 'Testimonial deleted successfully (local fallback)');
     } else {
       throw new Error('Testimonial not found');
     }

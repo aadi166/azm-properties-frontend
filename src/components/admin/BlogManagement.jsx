@@ -191,14 +191,19 @@ const BlogManagement = () => {
         fetchBlogs()
       } else {
         toast.error(response.message || 'Failed to delete blog')
-        // Fallback: remove from local state if API fails
-        setBlogs(prev => prev.filter(blog => blog._id !== blogId))
+        const adminToken = localStorage.getItem('adminToken') || localStorage.getItem('accessToken')
+        if (!adminToken) {
+          // Only remove locally when not authenticated
+          setBlogs(prev => prev.filter(blog => blog._id !== blogId))
+        }
       }
     } catch (error) {
       console.error('Error deleting blog:', error)
       toast.error('Error deleting blog')
-      // Fallback: remove from local state if API fails
-      setBlogs(prev => prev.filter(blog => blog._id !== blogId))
+      const adminToken = localStorage.getItem('adminToken') || localStorage.getItem('accessToken')
+      if (!adminToken) {
+        setBlogs(prev => prev.filter(blog => blog._id !== blogId))
+      }
     }
   }
 
