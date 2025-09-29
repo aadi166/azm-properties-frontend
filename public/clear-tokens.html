@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear Tokens</title>
+</head>
+<body>
+    <h1>Clearing Authentication Tokens...</h1>
+    <script>
+        // Clear all admin tokens
+        localStorage.removeItem('adminToken');
+        localStorage.removeItem('adminUser');
+        
+        // Clear any other auth-related items
+        localStorage.removeItem('token');
+        
+        console.log('Tokens cleared successfully');
+        
+        // Redirect to login after 2 seconds
+        setTimeout(() => {
+            window.location.href = '/admin/login';
+        }, 2000);
+    </script>
+    <p>Tokens cleared! Redirecting to login page...</p>
+</body>
+</html>
