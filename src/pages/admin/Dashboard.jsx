@@ -6,6 +6,7 @@ import ContactManagement from '../../components/admin/ContactManagement'
 import BlogManagement from '../../components/admin/BlogManagement'
 import DeveloperManagement from '../../components/admin/DeveloperManagement'
 import TestimonialManagement from '../../components/admin/TestimonialManagement'
+import ProjectManagement from '../../components/admin/ProjectManagement'
 import amzLogo from '../../assets/amz.logo.jpeg'
 
 const AdminDashboard = () => {
@@ -57,6 +58,15 @@ const AdminDashboard = () => {
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+        </svg>
+      )
+    },
+    { 
+      id: 'projects', 
+      label: 'Projects', 
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v4a1 1 0 001 1h3v6h8v-6h3a1 1 0 001-1V7M7 7V5a3 3 0 016 0v2" />
         </svg>
       )
     },
@@ -191,6 +201,7 @@ const AdminDashboard = () => {
               {activeTab === 'properties' && <PropertyManagement />}
               {activeTab === 'contacts' && <ContactManagement />}
               {activeTab === 'blogs' && <BlogManagement />}
+              {activeTab === 'projects' && <ProjectManagement />}
               {activeTab === 'developers' && <DeveloperManagement />}
               {activeTab === 'testimonials' && <TestimonialManagement />}
               {/* Wishlist removed from admin panel */}

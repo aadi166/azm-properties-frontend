@@ -251,17 +251,22 @@ const BlogManagement = () => {
 
       {/* Blog Form */}
       {showForm && (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-75 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border border-yellow-400/30 w-11/12 max-w-4xl shadow-lg rounded-md bg-gray-800">
-            <div className="mt-3">
-              <h3 className="text-lg font-medium text-yellow-300 mb-4">
-                {editingBlog ? 'Edit Blog Post' : 'Add New Blog Post'}
-              </h3>
-              
-              <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="bg-gray-800 rounded-2xl border border-yellow-400/30 max-w-4xl w-full mx-auto my-8 admin-modal-panel">
+          <div className="sticky top-0 bg-gray-800 p-6 border-b border-yellow-400/30 rounded-t-2xl">
+            <h3 className="text-xl font-bold text-yellow-300">
+              {editingBlog ? 'Edit Blog Post' : 'Add New Blog Post'}
+            </h3>
+          </div>
+
+          <div className="modal-body max-h-96 overflow-y-auto">
+            <form id="blogForm" onSubmit={handleSubmit} className="space-y-6 p-6">
+              {/* Basic Information */}
+              <div className="border-b border-yellow-400/30 pb-6">
+                <h4 className="text-md font-medium text-yellow-300 mb-4">Basic Information</h4>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-sm font-medium text-yellow-300 mb-2">
+                    <label className="block text-sm font-medium text-yellow-300 mb-1">
                       Title *
                     </label>
                     <input
@@ -270,12 +275,12 @@ const BlogManagement = () => {
                       value={formData.title}
                       onChange={handleInputChange}
                       required
-                      className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-md px-3 py-2 text-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                      className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
                     />
                   </div>
-                  
+
                   <div>
-                    <label className="block text-sm font-medium text-yellow-300 mb-2">
+                    <label className="block text-sm font-medium text-yellow-300 mb-1">
                       Category *
                     </label>
                     <select
@@ -283,7 +288,7 @@ const BlogManagement = () => {
                       value={formData.category}
                       onChange={handleInputChange}
                       required
-                      className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-md px-3 py-2 text-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                      className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
                     >
                       {categories.map(cat => (
                         <option key={cat} value={cat}>{cat}</option>
@@ -292,8 +297,8 @@ const BlogManagement = () => {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-yellow-300 mb-2">
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">
                     Content *
                   </label>
                   <textarea
@@ -301,37 +306,48 @@ const BlogManagement = () => {
                     value={formData.content}
                     onChange={handleInputChange}
                     required
-                    rows={8}
-                    className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-md px-3 py-2 text-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                    rows={6}
+                    placeholder="Write your blog content here..."
+                    className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-yellow-300 mb-2">
-                Tags (comma separated)
-              </label>
-              <input
-                type="text"
-                name="tags"
-                value={formData.tags}
-                onChange={handleInputChange}
-                placeholder="dubai, real estate, investment"
-                className="w-full bg-gray-700 border border-yellow-500/30 rounded-md px-3 py-2 text-white placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
-              />
-            </div>
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">
+                    Tags (comma separated)
+                  </label>
+                  <input
+                    type="text"
+                    name="tags"
+                    value={formData.tags}
+                    onChange={handleInputChange}
+                    placeholder="dubai, real estate, investment"
+                    className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+                  />
+                </div>
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-yellow-300 mb-1">
-                    Featured Image
+              {/* Image Upload */}
+              <div className="border-b border-yellow-400/30 pb-6">
+                <h4 className="text-md font-medium text-yellow-300 mb-4">Featured Image</h4>
+
+                <div>
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">
+                    Blog Image
                   </label>
                   <input
                     type="file"
                     name="image"
                     onChange={handleInputChange}
                     accept="image/*"
-                    className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-md px-3 py-2 text-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                    className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-yellow-400 file:text-gray-900 hover:file:bg-yellow-300 transition-all duration-300 backdrop-blur-sm"
                   />
                 </div>
+              </div>
+
+              {/* Publishing Options */}
+              <div className="border-b border-yellow-400/30 pb-6">
+                <h4 className="text-md font-medium text-yellow-300 mb-4">Publishing Options</h4>
 
                 <div className="flex items-center space-x-3">
                   <input
@@ -340,35 +356,35 @@ const BlogManagement = () => {
                     name="published"
                     checked={formData.published}
                     onChange={handleInputChange}
-                    className="w-4 h-4 text-yellow-400 bg-gray-900/50 border-yellow-400/30 rounded focus:ring-yellow-400 focus:ring-2"
+                    className="w-5 h-5 text-yellow-400 bg-gray-900 border-yellow-400/30 rounded focus:ring-yellow-400 focus:ring-2"
                   />
                   <label htmlFor="published" className="text-sm font-medium text-yellow-300 cursor-pointer">
                     Publish immediately
                   </label>
                 </div>
+              </div>
+            </form>
+          </div>
 
-                {/* Form Actions */}
-                <div className="flex justify-end space-x-3 pt-6 border-t border-yellow-400/30">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowForm(false)
-                      setEditingBlog(null)
-                      resetForm()
-                    }}
-                    className="px-4 py-2 border border-yellow-400/30 rounded-md text-yellow-300 hover:bg-gray-800/50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-yellow-600 text-gray-900 rounded-md hover:bg-yellow-500 font-medium"
-                  >
-                    {editingBlog ? 'Update Blog' : 'Create Blog'}
-                  </button>
-                </div>
-              </form>
-            </div>
+          <div className="modal-footer sticky bottom-0 bg-gray-800 p-6 border-t border-yellow-400/30 rounded-b-2xl">
+            <button
+              type="button"
+              onClick={() => {
+                setShowForm(false);
+                setEditingBlog(null);
+                resetForm();
+              }}
+              className="px-6 py-3 border border-yellow-400/30 text-yellow-300 rounded-xl hover:bg-yellow-400/10 transition-all duration-300 backdrop-blur-sm"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              form="blogForm"
+              className="px-6 py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-gray-900 rounded-xl hover:from-yellow-300 hover:to-yellow-400 font-medium transition-all duration-300 shadow-lg hover:shadow-xl"
+            >
+              {editingBlog ? 'Update Blog' : 'Create Blog'}
+            </button>
           </div>
         </div>
       )}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import apiService from '../services/api'
+import seededProperties from '../data/properties.js'
 import { toast } from 'react-hot-toast'
 import { useLocation } from 'react-router-dom'
 
@@ -21,7 +22,7 @@ const Projects = () => {
   const [sortBy, setSortBy] = useState('default')
   const [selectedProperty, setSelectedProperty] = useState(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [properties, setProperties] = useState([])
+  const [properties, setProperties] = useState([]) // will hold projects from API
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   // Pagination state
@@ -129,19 +130,70 @@ const Projects = () => {
       try {
         setLoading(true)
         setError(null)
-        
-        // Fetch local static data
-        const response = await apiService.getProperties()
-        
+        // Fetch projects from API (treat them as properties on this page)
+        const response = await apiService.getProjects()
+
         let allProperties = []
-        
-        // Process local data
-        if (response.success) {
-          allProperties = [...(response.data || [])]
+
+        // Process API data - support both array returns and { success, data } shape
+        if (Array.isArray(response)) {
+          allProperties = response
+        } else if (response && Array.isArray(response.data)) {
+          allProperties = response.data
+        } else if (response && response.success && Array.isArray(response.data)) {
+          allProperties = response.data
+        } else if (response && response.data && Array.isArray(response.data.items)) {
+          // some APIs return { data: { items: [...] } }
+          allProperties = response.data.items
+        } else {
+          // fallback: try to coerce object values into an array
+          if (response && typeof response === 'object') {
+            const possibleArray = Object.values(response).find(v => Array.isArray(v))
+            if (possibleArray) allProperties = possibleArray
+          }
         }
         
-        // Remove duplicates and set properties
-        const uniqueProperties = removeDuplicateProperties(allProperties)
+  // Remove duplicates and set properties
+  // If API returned no projects, try to fall back to localStorage (development fallback)
+        if (!allProperties || allProperties.length === 0) {
+          try {
+            const ls = localStorage.getItem('amz_projects')
+            if (ls) {
+              const parsed = JSON.parse(ls)
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                console.warn('Using localStorage amz_projects as fallback for projects')
+                allProperties = parsed
+              }
+            }
+          } catch (e) {
+            console.warn('Failed to parse amz_projects from localStorage', e)
+          }
+        }
+
+        // If still empty, use seeded static properties bundled with the app
+        if (!allProperties || allProperties.length === 0) {
+          if (Array.isArray(seededProperties) && seededProperties.length > 0) {
+            console.warn('Using bundled seededProperties as final fallback')
+            allProperties = seededProperties
+          }
+        }
+
+        // Normalize fields for each property to ensure filters work (title, projectName, price, location, _id)
+        const normalized = allProperties.map(p => ({
+          _id: p._id || p.id || p.uuid || null,
+          title: p.title || p.name || p.projectName || '',
+          projectName: p.projectName || p.name || p.title || '',
+          price: typeof p.price === 'number' ? p.price : (p.price && Number(p.price)) || (p.priceFrom || p.minPrice) || (p.priceRange && (p.priceRange.min || p.priceRange.max)) || 0,
+          location: p.location || p.city || p.address || 'Unknown',
+          bedrooms: p.bedrooms || p.units || null,
+          bathrooms: p.bathrooms || null,
+          area: p.area || p.size || null,
+          developer: p.developer || p.projectDeveloper || p.build_by || '',
+          category: p.category || p.type || 'off-plan',
+          ...p
+        }))
+
+        const uniqueProperties = removeDuplicateProperties(normalized)
         setProperties(uniqueProperties)
         
         if (allProperties.length === 0) {
@@ -149,6 +201,67 @@ const Projects = () => {
         }
       } catch (err) {
         console.error('Error fetching projects:', err)
+
+        // Fallback 1: try to load from apiService.getProperties() which reads seeded `amz_properties`
+        try {
+          const propsResp = await apiService.getProperties()
+          if (propsResp && propsResp.success && Array.isArray(propsResp.data)) {
+            const fallback = propsResp.data.map(p => ({
+              _id: p._id || p.id || null,
+              title: p.title || p.name || p.projectName || '',
+              projectName: p.projectName || p.name || p.title || '',
+              price: typeof p.price === 'number' ? p.price : (p.price && Number(p.price)) || (p.priceFrom || p.minPrice) || (p.priceRange && (p.priceRange.min || p.priceRange.max)) || 0,
+              location: p.location || p.city || p.address || 'Unknown',
+              bedrooms: p.bedrooms || p.units || null,
+              bathrooms: p.bathrooms || null,
+              area: p.area || p.size || null,
+              developer: p.developer || p.projectDeveloper || p.build_by || '',
+              category: p.category || p.type || 'off-plan',
+              ...p
+            }))
+
+            const uniqueProperties = removeDuplicateProperties(fallback)
+            setProperties(uniqueProperties)
+            setLoading(false)
+            return
+          }
+        } catch (e) {
+          console.warn('Fallback getProperties failed', e)
+        }
+
+        // Fallback 2: try localStorage amz_projects or amz_properties
+        try {
+          const lsCandidates = ['amz_projects', 'amz_properties']
+          for (const key of lsCandidates) {
+            const raw = localStorage.getItem(key)
+            if (!raw) continue
+            const parsed = JSON.parse(raw)
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              const fallback = parsed.map(p => ({
+                _id: p._id || p.id || null,
+                title: p.title || p.name || p.projectName || '',
+                projectName: p.projectName || p.name || p.title || '',
+                price: typeof p.price === 'number' ? p.price : (p.price && Number(p.price)) || (p.priceFrom || p.minPrice) || (p.priceRange && (p.priceRange.min || p.priceRange.max)) || 0,
+                location: p.location || p.city || p.address || 'Unknown',
+                bedrooms: p.bedrooms || p.units || null,
+                bathrooms: p.bathrooms || null,
+                area: p.area || p.size || null,
+                developer: p.developer || p.projectDeveloper || p.build_by || '',
+                category: p.category || p.type || 'off-plan',
+                ...p
+              }))
+
+              const uniqueProperties = removeDuplicateProperties(fallback)
+              setProperties(uniqueProperties)
+              setLoading(false)
+              return
+            }
+          }
+        } catch (e) {
+          console.warn('LocalStorage fallback failed', e)
+        }
+
+        // If all fallbacks failed, set error
         setError('Failed to connect to server')
       } finally {
         setLoading(false)
@@ -180,8 +293,11 @@ const Projects = () => {
   }, [])
 
   const filteredProperties = Array.isArray(properties) ? properties.filter(property => {
-    // Only show off-plan properties on this page
-    const offPlanMatch = property.category === 'off-plan'
+    // Historically this page showed off-plan projects only. Many APIs use different category names
+    // so treat category containing "off" as off-plan, otherwise default to showing the project.
+    const offPlanMatch = property.category
+      ? String(property.category).toLowerCase().includes('off')
+      : true
     const typeMatch = filter === 'all' || property.category === filter
     const locationMatch = locationFilter === 'all' || property.location === locationFilter
   const projectMatch = projectFilter === 'all' || (property.projectName && property.projectName === projectFilter)
@@ -535,41 +651,18 @@ const Projects = () => {
             <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8' : 'space-y-8'}>
               {currentProperties.map((property) => (
                 <div
-                  key={property._id}
+                  key={property._id || property.id}
                   className={`group cursor-pointer transform transition-all duration-500 hover:scale-105 ${
                     viewMode === 'list' ? 'flex bg-gray-900/50 backdrop-blur-sm rounded-2xl overflow-hidden border border-gold-500/20 hover:border-gold-400/40' : 'bg-gray-900/50 backdrop-blur-sm rounded-2xl overflow-hidden border border-gold-500/20 hover:border-gold-400/40'
                   }`}
                   onClick={() => openPropertyDetail(property)}
                 >
-                  {/* Property Image */}
-                  <div className={`relative overflow-hidden ${viewMode === 'list' ? 'w-1/3' : 'h-64'}`}>
-                    <img
-                      src={property.image || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'}
-                      alt={property.title}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                      onError={(e) => {
-                        e.target.src = 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
-                      }}
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
-                    
-                    {/* Property Type Badge */}
-                    <div className="absolute top-4 left-4 flex flex-col gap-2">
-                      <span className="px-3 py-1 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-xs font-semibold rounded-full">
-                        Off-Plan
-                      </span>
-                      {/* Construction Status Badge */}
-                      {property.constructionStatus && (
-                        <span className={`px-3 py-1 text-white text-xs font-semibold rounded-full ${
-                          property.constructionStatus.toLowerCase() === 'ready' ? 'bg-gradient-to-r from-green-600 to-green-500' :
-                          property.constructionStatus.toLowerCase() === 'in-construction' ? 'bg-gradient-to-r from-orange-600 to-orange-500' :
-                          'bg-gradient-to-r from-purple-600 to-purple-500'
-                        }`}>
-                          {property.constructionStatus}
-                        </span>
-                      )}
-
+                  {/* No image for projects: replace image area with colored panel */}
+                  <div className={`relative overflow-hidden ${viewMode === 'list' ? 'w-1/3' : 'h-40'}`}>
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-700 text-gold-400 font-semibold text-lg">
+                      {property.title || property.name || property.name}
                     </div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
 
                     {/* Action Buttons */}
                     <div className="absolute top-4 right-4 flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
@@ -603,14 +696,14 @@ const Projects = () => {
                     </div>
                   </div>
 
-                  {/* Property Details */}
+                  {/* Project Details */}
                   <div className={`p-6 ${viewMode === 'list' ? 'flex-1' : ''}`}>
                     <div className="mb-4">
                       <h3 className="text-xl font-bold text-white mb-2 group-hover:text-gold-400 transition-colors">
-                        {property.title}
+                        {property.title || property.name || property.name}
                       </h3>
                       <p className="text-gold-400 text-sm font-medium mb-1">
-                        {property.projectName}
+                        {property.projectName || property.name || ''}
                       </p>
                       <p className="text-gray-400 text-sm flex items-center">
                         <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -621,14 +714,14 @@ const Projects = () => {
                       </p>
                     </div>
 
-                    {/* Property Features */}
+                    {/* Property Features (adapted for projects) */}
                     <div className="grid grid-cols-3 gap-4 mb-4">
                       <div className="text-center">
-                        <div className="text-gold-400 font-semibold">{property.bedrooms}</div>
+                        <div className="text-gold-400 font-semibold">{property.bedrooms || property.units || '-'}</div>
                         <div className="text-gray-400 text-xs">Bedrooms</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-gold-400 font-semibold">{property.bathrooms}</div>
+                        <div className="text-gold-400 font-semibold">{property.bathrooms || '-'}</div>
                         <div className="text-gray-400 text-xs">Bathrooms</div>
                       </div>
                       <div className="text-center">
@@ -903,11 +996,17 @@ const Projects = () => {
             {selectedPropertyForNote && (
               <div className="mb-6">
                 <div className="flex items-center space-x-4 mb-4">
-                  <img
-                    src={selectedPropertyForNote.image || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80'}
-                    alt={selectedPropertyForNote.title}
-                    className="w-16 h-16 object-cover rounded-lg"
-                  />
+                  {(selectedPropertyForNote.category !== 'off-plan' && selectedPropertyForNote.image) ? (
+                    <img
+                      src={selectedPropertyForNote.image}
+                      alt={selectedPropertyForNote.title}
+                      className="w-16 h-16 object-cover rounded-lg"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-gray-900 to-gray-800 flex items-center justify-center text-gold-400 font-semibold">
+                      <span className="text-sm">{(selectedPropertyForNote.title || '').slice(0,2).toUpperCase()}</span>
+                    </div>
+                  )}
                   <div>
                     <h4 className="text-white font-semibold">{selectedPropertyForNote.title}</h4>
                     <p className="text-gray-400 text-sm">{selectedPropertyForNote.location}</p>

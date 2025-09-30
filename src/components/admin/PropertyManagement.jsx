@@ -140,24 +140,7 @@ const PropertyManagement = () => {
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="bg-black shadow rounded-lg p-6 border border-yellow-400/30">
-        <div className="flex space-x-4">
-          {filters.map((filter) => (
-            <button
-              key={filter.id}
-              onClick={() => setActiveFilter(filter.id)}
-              className={`px-4 py-2 rounded-md font-medium transition-colors ${
-                activeFilter === filter.id
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-gray-800 text-yellow-300 hover:bg-gray-700'
-              }`}
-            >
-              {filter.label} ({filter.count})
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* Filters removed to match ProjectManagement simple listing */}
 
       {/* Property Form Modal */}
       {showForm && (

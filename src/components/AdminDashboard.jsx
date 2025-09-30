@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import PropertyManager from './PropertyManager'
 import ContactManager from './ContactManager'
-import ProjectManager from './ProjectManager'
+import ProjectManagement from './admin/ProjectManagement'
+import DeveloperManagement from './admin/DeveloperManagement'
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('dashboard')
@@ -126,7 +127,9 @@ const AdminDashboard = () => {
         return <PropertyManager />
       
       case 'projects':
-        return <ProjectManager />
+        return <ProjectManagement />
+        case 'developers':
+          return <DeveloperManagement />
       
       case 'contact':
         return <ContactManager />

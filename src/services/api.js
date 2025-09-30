@@ -1,6 +1,5 @@
 // Static API service - returns static data instead of making HTTP requests
 import { properties, blogs, partners, testimonials, contacts } from '../data/index.js';
-import { projects } from '../data/projects.js';
 
 // Global API configuration
 const API_CONFIG = {
@@ -13,9 +12,14 @@ const API_CONFIG = {
     TESTIMONIAL_READ: '/api/testimonial/read',
     TESTIMONIAL_DELETE: '/api/testimonial/delete',
     DEVELOPER_CREATE: '/api/developer/create',
-    DEVELOPER_DELETE: '/api/developer/delete'
-    ,PROJECT_READ: '/api/project/read',
-    DEVELOPER_READ: '/api/developer/read'
+    DEVELOPER_DELETE: '/api/developer/delete',
+    PROJECT_READ: '/api/project/read',
+    PROJECT_CREATE: '/api/project/create',
+    PROJECT_DELETE: '/api/project/delete',
+    DEVELOPER_READ: '/api/developer/read',
+    CONTACT_CREATE: '/api/contact/create',
+    CONTACT_READ: '/api/contact/read',
+    CONTACT_DELETE: '/api/contact/delete'
   }
 };
 
@@ -292,20 +296,50 @@ class StaticApiService {
   }
 
   async createProject(projectData) {
-    await simulateDelay();
-    const projectsData = getFromStorage(STORAGE_KEYS.PROJECTS);
-    const newProject = {
-      ...projectData,
-      _id: generateId(),
-      id: generateId(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    
-    projectsData.push(newProject);
-    saveToStorage(STORAGE_KEYS.PROJECTS, projectsData);
-    
-    return this.createResponse(newProject, true, 'Project created successfully');
+    try {
+      const endpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.PROJECT_CREATE}`;
+      const token = localStorage.getItem(STORAGE_KEYS.ADMIN_TOKEN) || localStorage.getItem('accessToken');
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-session-key': token || ''
+        },
+        body: JSON.stringify(projectData)
+      });
+
+      const result = await response.json().catch(() => null);
+      if (response.ok && result && (result.response_code === 200 || result.success === true)) {
+        const created = result.response_data || projectData;
+        const project = {
+          _id: created.id || created._id || generateId(),
+          id: created.id || created._id || generateId(),
+          name: created.name || created.title || '',
+          location: created.location || '',
+          project_types: created.project_types || created.project_type || '',
+          bedrooms: created.bedrooms || 0,
+          area: created.area || '',
+          description: created.description || '',
+          total_units: created.total_units || 0,
+          project_statuses: created.project_statuses || created.status || 'planned',
+          launch_date: created.launch_date || '',
+          completion_date: created.completion_date || '',
+          createdAt: created.created_on ? new Date(created.created_on).toISOString() : new Date().toISOString(),
+          updatedAt: created.updated_on ? new Date(created.updated_on).toISOString() : new Date().toISOString()
+        };
+
+        return this.createResponse(project, true, result.response_message || 'Project created successfully');
+      }
+
+  // Return a structured failure response instead of throwing, include raw server result for diagnostics
+  const errMsg = (result && (result.response_message || result.message)) || `HTTP ${response.status}`;
+  return this.createResponse(result || { message: errMsg }, false, errMsg || 'Failed to create project');
+    } catch (error) {
+      console.error('Error creating project via API:', error);
+      // Return a failure response including error message for diagnostics
+      return this.createResponse({ error: error && error.message ? error.message : String(error) }, false, error && error.message ? error.message : 'Network error while creating project');
+    }
   }
 
   async updateProject(id, projectData) {
@@ -327,42 +361,105 @@ class StaticApiService {
   }
 
   async deleteProject(id) {
-    await simulateDelay();
-    const projectsData = getFromStorage(STORAGE_KEYS.PROJECTS);
-    const filteredProjects = projectsData.filter(p => p._id !== id && p.id !== id);
-    
-    if (filteredProjects.length < projectsData.length) {
-      saveToStorage(STORAGE_KEYS.PROJECTS, filteredProjects);
-      return this.createResponse(null, true, 'Project deleted successfully');
-    } else {
-      throw new Error('Project not found');
+    try {
+      const endpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.PROJECT_DELETE}`;
+      const token = localStorage.getItem(STORAGE_KEYS.ADMIN_TOKEN) || localStorage.getItem('accessToken');
+
+      const response = await fetch(endpoint, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-session-key': token || ''
+        },
+        body: JSON.stringify({ id })
+      });
+
+      const result = await response.json().catch(() => null);
+      if (response.ok && result && (result.response_code === 200 || result.success === true)) {
+        return this.createResponse(null, true, result.response_message || 'Project deleted successfully');
+      }
+
+      const errMsg = (result && (result.response_message || result.message)) || `HTTP ${response.status}`;
+      throw new Error(errMsg || 'Failed to delete project');
+    } catch (error) {
+      console.error('Error deleting project via API:', error);
+      throw error;
     }
   }
 
   // Contact API methods
   async submitContactForm(formData) {
-    await simulateDelay();
-    const contactsData = getFromStorage(STORAGE_KEYS.CONTACTS);
-    const newContact = {
-      ...formData,
-      _id: generateId(),
-      id: generateId(),
-      status: 'new',
-      source: 'website',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    
-    contactsData.push(newContact);
-    saveToStorage(STORAGE_KEYS.CONTACTS, contactsData);
-    
-    return this.createResponse(newContact, true, 'Contact form submitted successfully');
+    try {
+      const endpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.CONTACT_CREATE}`;
+      const token = localStorage.getItem(STORAGE_KEYS.ADMIN_TOKEN) || localStorage.getItem('accessToken');
+
+      // Create FormData object
+      let data = formData;
+      if (!(formData instanceof FormData)) {
+        data = new FormData();
+        Object.keys(formData).forEach(key => {
+          data.append(key, formData[key]);
+        });
+      }
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'x-session-key': token || ''
+        },
+        body: data
+      });
+
+      const result = await response.json().catch(() => null);
+      if (response.ok && result && (result.response_code === 200 || result.success === true)) {
+        return this.createResponse(result.response_data || formData, true, result.response_message || 'Contact form submitted successfully');
+      }
+
+      const errMsg = (result && (result.response_message || result.message)) || `HTTP ${response.status}`;
+      throw new Error(errMsg || 'Failed to submit contact form');
+    } catch (error) {
+      console.error('Error submitting contact form via API:', error);
+      throw error;
+    }
   }
 
   async getContactSubmissions() {
-    await simulateDelay();
-    const contactsData = getFromStorage(STORAGE_KEYS.CONTACTS);
-    return this.createResponse(contactsData);
+    try {
+      const endpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.CONTACT_READ}`;
+      const token = localStorage.getItem(STORAGE_KEYS.ADMIN_TOKEN) || localStorage.getItem('accessToken');
+
+      const response = await fetch(endpoint, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-session-key': token || ''
+        }
+      });
+
+      const result = await response.json().catch(() => null);
+      if (response.ok && result && (result.response_code === 200 || result.success === true)) {
+        const contacts = (result.response_data || []).map(contact => ({
+          _id: contact.id || contact._id,
+          id: contact.id || contact._id,
+          name: contact.name,
+          email: contact.email,
+          phone: contact.phone,
+          message: contact.message,
+          status: contact.status || 'new',
+          source: contact.source || 'website',
+          createdAt: contact.created_on ? new Date(contact.created_on).toISOString() : (contact.createdAt || new Date().toISOString()),
+          updatedAt: contact.updated_on ? new Date(contact.updated_on).toISOString() : (contact.updatedAt || new Date().toISOString())
+        }));
+
+        return this.createResponse(contacts, true, result.response_message || 'Contacts retrieved successfully');
+      }
+
+      const errMsg = (result && (result.response_message || result.message)) || `HTTP ${response.status}`;
+      throw new Error(errMsg || 'Failed to retrieve contacts');
+    } catch (error) {
+      console.error('Error fetching contacts via API:', error);
+      throw error;
+    }
   }
 
   async updateContact(id, contactData) {
@@ -388,15 +485,29 @@ class StaticApiService {
   }
 
   async deleteContact(id) {
-    await simulateDelay();
-    const contactsData = getFromStorage(STORAGE_KEYS.CONTACTS);
-    const filteredContacts = contactsData.filter(c => c._id !== id && c.id !== id);
-    
-    if (filteredContacts.length < contactsData.length) {
-      saveToStorage(STORAGE_KEYS.CONTACTS, filteredContacts);
-      return this.createResponse(null, true, 'Contact deleted successfully');
-    } else {
-      throw new Error('Contact not found');
+    try {
+      const endpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.CONTACT_DELETE}`;
+      const token = localStorage.getItem(STORAGE_KEYS.ADMIN_TOKEN) || localStorage.getItem('accessToken');
+
+      const response = await fetch(endpoint, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-session-key': token || ''
+        },
+        body: JSON.stringify({ id })
+      });
+
+      const result = await response.json().catch(() => null);
+      if (response.ok && result && (result.response_code === 200 || result.success === true)) {
+        return this.createResponse(null, true, result.response_message || 'Contact deleted successfully');
+      }
+
+      const errMsg = (result && (result.response_message || result.message)) || `HTTP ${response.status}`;
+      throw new Error(errMsg || 'Failed to delete contact');
+    } catch (error) {
+      console.error('Error deleting contact via API:', error);
+      throw error;
     }
   }
 

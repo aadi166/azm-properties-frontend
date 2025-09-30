@@ -106,12 +106,24 @@ const PropertyDetail = () => {
       {/* Hero Section */}
       <section className="relative h-screen">
         <div className="absolute inset-0">
-          <img
-            src={property.image || 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80'}
-            alt={property.title}
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent"></div>
+          {/* If this is a project/off-plan without reliable images, show a placeholder panel */}
+          {property.category === 'off-plan' || !property.image ? (
+            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-900 to-gray-800 text-gold-400">
+              <div className="text-center p-8">
+                <h2 className="text-3xl font-bold">{property.title}</h2>
+                <p className="text-gray-300 mt-2">{property.projectName || property.location}</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              <img
+                src={property.image}
+                alt={property.title}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent"></div>
+            </>
+          )}
         </div>
         
         <div className="relative z-10 container mx-auto px-4 h-full flex items-end pb-20">

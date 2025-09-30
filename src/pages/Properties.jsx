@@ -298,212 +298,7 @@ const Properties = () => {
         </div>
       </section>
 
-      {/* Advanced Filters */}
-      <section className="py-8 bg-black/90 backdrop-blur-sm border-b border-gold-500/20">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col gap-6">
-            {/* Search Bar */}
-            <div className="relative">
-                  <label className="block text-sm font-medium text-gold-400 mb-2">Search by Project Name or Location</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Enter project name or location..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full px-6 py-4 pl-12 bg-dark-800 border border-gold-500/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-gold-500 focus:border-gold-500 text-lg text-white placeholder-gray-400"
-                />
-                <svg className="w-5 h-5 text-gray-400 absolute left-4 top-1/2 transform -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-            </div>
-            
-            {/* Filter Row */}
-            <div className="flex flex-wrap gap-4 items-center justify-between">
-              <div className="flex flex-wrap gap-4 items-center">
-                <div className="relative">
-                  <label className="block text-xs font-medium text-gold-400 mb-1">Property Type</label>
-                  <select 
-                    value={filter} 
-                    onChange={(e) => setFilter(e.target.value)}
-                    className="luxury-select"
-                  >
-                    <option key="all-types" value="all">All Types</option>
-                    <option key="apartment" value="apartment">Apartments</option>
-                    <option key="villa" value="villa">Villas</option>
-                    <option key="penthouse" value="penthouse">Penthouses</option>
-                    <option key="townhouse" value="townhouse">Townhouses</option>
-                    <option key="studio" value="studio">Studios</option>
-                  </select>
-                </div>
-
-                <div className="relative">
-                  <label className="block text-xs font-medium text-gold-400 mb-1">Bedrooms</label>
-                  <select 
-                    value={bedroomsFilter} 
-                    onChange={(e) => setBedroomsFilter(e.target.value)}
-                    className="luxury-select"
-                  >
-                    <option key="all-bedrooms" value="all">All Bedrooms</option>
-                    <option key="studio-bed" value="0">Studio</option>
-                    <option key="1-bed" value="1">1 Bedroom</option>
-                    <option key="2-bed" value="2">2 Bedrooms</option>
-                    <option key="3-bed" value="3">3 Bedrooms</option>
-                    <option key="4-bed" value="4">4 Bedrooms</option>
-                    <option key="5-bed" value="5">5+ Bedrooms</option>
-                  </select>
-                </div>
-
-                <div className="relative">
-                  <label className="block text-xs font-medium text-gold-400 mb-1">Bathrooms</label>
-                  <select 
-                    value={bathroomsFilter} 
-                    onChange={(e) => setBathroomsFilter(e.target.value)}
-                    className="luxury-select"
-                  >
-                    <option key="all-bathrooms" value="all">All Bathrooms</option>
-                    <option key="1-bath" value="1">1 Bathroom</option>
-                    <option key="2-bath" value="2">2 Bathrooms</option>
-                    <option key="3-bath" value="3">3 Bathrooms</option>
-                    <option key="4-bath" value="4">4 Bathrooms</option>
-                    <option key="5-bath" value="5">5+ Bathrooms</option>
-                  </select>
-                </div>
-                
-                <div className="relative">
-                  <label className="block text-xs font-medium text-gold-400 mb-1">Location</label>
-                  <select 
-                    value={locationFilter} 
-                    onChange={(e) => setLocationFilter(e.target.value)}
-                    className="luxury-select"
-                  >
-                    <option key="all-locations" value="all">All Locations</option>
-                    {uniqueLocations.map(location => (
-                      <option key={location} value={location}>{location}</option>
-                    ))}
-                  </select>
-                </div>
-                
-                
-                <div className="relative">
-                  <label className="block text-xs font-medium text-gold-400 mb-1">Construction Status</label>
-                  <select 
-                    value={constructionStatusFilter} 
-                    onChange={(e) => setConstructionStatusFilter(e.target.value)}
-                    className="luxury-select"
-                  >
-                    <option key="all-construction" value="all">All Status</option>
-                    <option key="ready" value="ready">Ready</option>
-                    <option key="in-construction" value="in-construction">In Construction</option>
-                  </select>
-                </div>
-
-                <div className="relative">
-                  <label className="block text-xs font-medium text-gold-400 mb-1">Status</label>
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="luxury-select"
-                  >
-                    <option value="all">All</option>
-                    <option value="ready-secondary">Ready Secondary</option>
-                    <option value="offplan-secondary">Offplan Secondary</option>
-                  </select>
-                </div>
-
-                <div className="relative">
-                  <label className="block text-xs font-medium text-gold-400 mb-1">Price Range</label>
-                  <select
-                    value={priceRange}
-                    onChange={(e) => setPriceRange(e.target.value)}
-                    className="luxury-select"
-                  >
-                    <option value="all">All Prices</option>
-                    <option value="under-2m">Under AED 2M</option>
-                    <option value="2m-5m">AED 2M - 5M</option>
-                    <option value="5m-10m">AED 5M - 10M</option>
-                    <option value="over-10m">Over AED 10M</option>
-                  </select>
-                </div>
-
-                <div className="relative">
-                  <label className="block text-xs font-medium text-gold-400 mb-1">Offer Type</label>
-                  <select 
-                    value={offerTypeFilter} 
-                    onChange={(e) => setOfferTypeFilter(e.target.value)}
-                    className="luxury-select"
-                  >
-                    <option key="all-offer" value="all">All Offers</option>
-                    <option key="sale" value="Sale">For Sale</option>
-                    <option key="rent" value="Rent">For Rent</option>
-                  </select>
-                </div>
-
-                <div className="relative">
-                  <label className="block text-xs font-medium text-gold-400 mb-1">Sort By</label>
-                  <select 
-                    value={sortBy} 
-                    onChange={(e) => setSortBy(e.target.value)}
-                    className="luxury-select"
-                  >
-                    <option value="default">Default</option>
-                    <option value="price-low-high">Price: Low to High</option>
-                    <option value="price-high-low">Price: High to Low</option>
-                    <option value="bedrooms-low-high">Bedrooms: Low to High</option>
-                    <option value="bedrooms-high-low">Bedrooms: High to Low</option>
-                    <option value="size-low-high">Size: Small to Large</option>
-                    <option value="size-high-low">Size: Large to Small</option>
-                  </select>
-                </div>
-                
-                <div className="flex items-end">
-                  <button 
-                    onClick={resetFilters}
-                    className="btn-primary text-sm mt-6"
-                  >
-                    Clear All
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Results Summary */}
-            <div className="flex justify-between items-center">
-              <p className="text-gray-300">
-                Showing <span className="text-gold-400 font-semibold">{sortedProperties.length}</span> of{' '}
-                <span className="text-gold-400 font-semibold">{properties.length}</span> properties
-              </p>
-              
-              {/* View Mode Toggle */}
-              <div className="flex items-center space-x-2">
-              <div className="flex bg-dark-700 rounded-lg p-1">
-                <button
-                  onClick={() => setViewMode('grid')}
-                  className={`p-2 rounded transition-colors ${
-                    viewMode === 'grid' ? 'bg-gold-500 shadow-sm text-black' : 'text-gray-400 hover:text-gold-400'
-                  }`}
-                >
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => setViewMode('list')}
-                  className={`p-2 rounded transition-colors ${
-                    viewMode === 'list' ? 'bg-gold-500 shadow-sm text-black' : 'text-gray-400 hover:text-gold-400'
-                  }`}
-                >
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Advanced filters hidden per request (logic still available in code) */}
 
       {/* Properties Grid/List */}
       <section className="py-16">
@@ -558,14 +353,19 @@ const Properties = () => {
                 >
                   {/* Property Image */}
                   <div className={`relative overflow-hidden ${viewMode === 'list' ? 'w-1/3' : 'h-64'}`}>
-                    <img
-                      src={property.images && property.images[0] ? property.images[0] : property.image}
-                      alt={property.title}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                      onError={(e) => {
-                        e.target.src = 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
-                      }}
-                    />
+                    {/* Avoid rendering images for project/off-plan entries; show image only for standard properties */}
+                    {(property.category !== 'off-plan' && (property.images && property.images[0] || property.image)) ? (
+                      <img
+                        src={property.images && property.images[0] ? property.images[0] : property.image}
+                        alt={property.title}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80' }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-900 to-gray-800 text-gold-400 font-semibold text-lg">
+                        {property.title || property.name}
+                      </div>
+                    )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent"></div>
                     
                     {/* Property Type Badge */}
@@ -774,11 +574,21 @@ const Properties = () => {
                 </svg>
               </button>
               
-              <img
-                src={selectedProperty.images && selectedProperty.images[0] ? selectedProperty.images[0] : selectedProperty.image}
-                alt={selectedProperty.title}
-                className="w-full h-80 object-cover"
-              />
+              {/* Use placeholder panel when selected item is a project or has no images */}
+              {(selectedProperty.category !== 'off-plan' && (selectedProperty.images && selectedProperty.images[0] || selectedProperty.image)) ? (
+                <img
+                  src={selectedProperty.images && selectedProperty.images[0] ? selectedProperty.images[0] : selectedProperty.image}
+                  alt={selectedProperty.title}
+                  className="w-full h-80 object-cover"
+                />
+              ) : (
+                <div className="w-full h-80 flex items-center justify-center bg-gradient-to-br from-gray-900 to-gray-800 text-gold-400">
+                  <div className="text-center p-4">
+                    <h3 className="text-xl font-semibold">{selectedProperty.title}</h3>
+                    <p className="text-gray-300">{selectedProperty.location}</p>
+                  </div>
+                </div>
+              )}
               
               <div className="absolute bottom-6 left-6">
                 <span className="bg-dark-800/80 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm font-medium capitalize">

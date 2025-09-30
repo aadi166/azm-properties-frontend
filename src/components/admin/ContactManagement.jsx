@@ -32,56 +32,16 @@ const ContactManagement = () => {
       if (response.success) {
         setContacts(response.data || [])
       } else {
-        // Fallback to mock data if API fails
         console.error('API returned error:', response.error)
-        setContacts(mockContacts)
         toast.error('Failed to load contacts')
       }
     } catch (error) {
       console.error('Error fetching contacts:', error)
-      setContacts(mockContacts)
       toast.error('Failed to load contacts')
     } finally {
       setLoading(false)
     }
   }
-
-  // Mock contacts data
-  const mockContacts = [
-    {
-      _id: 1,
-      id: 1,
-      name: 'John Smith',
-      email: 'john.smith@email.com',
-      phone: '+971 50 123 4567',
-      subject: 'Property Inquiry',
-      message: 'I am interested in luxury properties in Downtown Dubai.',
-      status: 'new',
-      createdAt: new Date().toISOString()
-    },
-    {
-      _id: 2,
-      id: 2,
-      name: 'Sarah Johnson',
-      email: 'sarah.j@email.com',
-      phone: '+971 55 987 6543',
-      subject: 'Investment Consultation',
-      message: 'Looking for investment opportunities in off-plan properties.',
-      status: 'contacted',
-      createdAt: new Date(Date.now() - 86400000).toISOString()
-    },
-    {
-      _id: 3,
-      id: 3,
-      name: 'Ahmed Al-Rashid',
-      email: 'ahmed.rashid@email.com',
-      phone: '+971 52 456 7890',
-      subject: 'Property Management',
-      message: 'Need property management services for my villa in Palm Jumeirah.',
-      status: 'resolved',
-      createdAt: new Date(Date.now() - 172800000).toISOString()
-    }
-  ]
 
   const handleStatusChange = async (contactId, newStatus) => {
     try {

@@ -128,18 +128,22 @@ const PropertyForm = ({ property, onSubmit, onCancel }) => {
   }
 
   return (
-    <div className="fixed inset-0 bg-gray-900 bg-opacity-75 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border border-yellow-400/30 w-11/12 max-w-4xl shadow-lg rounded-md bg-gray-800">
-        <div className="mt-3">
-          <h3 className="text-lg font-medium text-yellow-300 mb-4">
-            {property ? 'Edit Property' : 'Add New Property'}
-          </h3>
-          
-          <form onSubmit={handleSubmit} className="space-y-6">
+    <div className="bg-gray-800 rounded-2xl border border-yellow-400/30 max-w-4xl w-full mx-auto my-8 admin-modal-panel">
+      <div className="sticky top-0 bg-gray-800 p-6 border-b border-yellow-400/30 rounded-t-2xl">
+        <h3 className="text-xl font-bold text-yellow-300">
+          {property ? 'Edit Property' : 'Add New Property'}
+        </h3>
+      </div>
+
+      <div className="modal-body max-h-96 overflow-y-auto">
+        <form id="propertyForm" onSubmit={handleSubmit} className="space-y-6 p-6">
+          {/* Basic Information */}
+          <div className="border-b border-yellow-400/30 pb-6">
+            <h4 className="text-md font-medium text-yellow-300 mb-4">Basic Information</h4>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Title */}
               <div>
-                <label className="block text-sm font-medium text-yellow-300 mb-2">
+                <label className="block text-sm font-medium text-yellow-300 mb-1">
                   Title *
                 </label>
                 <input
@@ -148,14 +152,241 @@ const PropertyForm = ({ property, onSubmit, onCancel }) => {
                   required
                   value={formData.title}
                   onChange={handleChange}
-                  className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-md px-3 py-2 text-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                  className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
                 />
               </div>
-              
-              {/* Image Upload */}
+
               <div>
-                <label className="block text-sm font-medium text-yellow-300 mb-2">
-                  Property Image *
+                <label className="block text-sm font-medium text-yellow-300 mb-1">
+                  Property Type *
+                </label>
+                <select
+                  name="type"
+                  required
+                  value={formData.type}
+                  onChange={handleChange}
+                  className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+                >
+                  <option value="exclusive">Exclusive Property</option>
+                  <option value="off-plan">Off-Plan Property</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-yellow-300 mb-1">
+                  Price (AED) *
+                </label>
+                <input
+                  type="number"
+                  name="price"
+                  required
+                  value={formData.price}
+                  onChange={handleChange}
+                  className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-yellow-300 mb-1">
+                  Location *
+                </label>
+                <input
+                  type="text"
+                  name="location"
+                  required
+                  value={formData.location}
+                  onChange={handleChange}
+                  className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+                />
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-yellow-300 mb-1">
+                Description *
+              </label>
+              <textarea
+                name="description"
+                required
+                rows={4}
+                value={formData.description}
+                onChange={handleChange}
+                className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+              />
+            </div>
+          </div>
+
+          {/* Property Details */}
+          <div className="border-b border-yellow-400/30 pb-6">
+            <h4 className="text-md font-medium text-yellow-300 mb-4">Property Details</h4>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-yellow-300 mb-1">
+                  Bedrooms
+                </label>
+                <input
+                  type="number"
+                  name="bedrooms"
+                  value={formData.bedrooms}
+                  onChange={handleChange}
+                  className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-yellow-300 mb-1">
+                  Bathrooms
+                </label>
+                <input
+                  type="number"
+                  name="bathrooms"
+                  value={formData.bathrooms}
+                  onChange={handleChange}
+                  className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-yellow-300 mb-1">
+                  Area (sq ft)
+                </label>
+                <input
+                  type="number"
+                  name="area"
+                  value={formData.area}
+                  onChange={handleChange}
+                  className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+                />
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-yellow-300 mb-1">
+                Status
+              </label>
+              <select
+                name="status"
+                value={formData.status}
+                onChange={handleChange}
+                className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+              >
+                <option value="available">Available</option>
+                <option value="sold">Sold</option>
+                <option value="reserved">Reserved</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Features */}
+          <div className="border-b border-yellow-400/30 pb-6">
+            <h4 className="text-md font-medium text-yellow-300 mb-4">Features</h4>
+
+            <div className="flex gap-2 mb-4">
+              <input
+                type="text"
+                value={newFeature}
+                onChange={(e) => setNewFeature(e.target.value)}
+                placeholder="Add a feature"
+                className="flex-1 bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddFeature())}
+              />
+              <button
+                type="button"
+                onClick={handleAddFeature}
+                className="px-6 py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-gray-900 rounded-xl hover:from-yellow-300 hover:to-yellow-400 font-medium transition-all duration-300 shadow-lg hover:shadow-xl"
+              >
+                Add
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {formData.features.map((feature, index) => (
+                <span
+                  key={index}
+                  className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-yellow-400/20 text-yellow-300 border border-yellow-400/30"
+                >
+                  {feature}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveFeature(index)}
+                    className="ml-2 text-yellow-400 hover:text-yellow-200"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Off-plan specific fields */}
+          {formData.type === 'off-plan' && (
+            <div className="border-b border-yellow-400/30 pb-6">
+              <h4 className="text-md font-medium text-yellow-300 mb-4">Off-Plan Details</h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">
+                    Developer
+                  </label>
+                  <input
+                    type="text"
+                    name="developer"
+                    value={formData.developer}
+                    onChange={handleChange}
+                    className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">
+                    Completion Date
+                  </label>
+                  <input
+                    type="date"
+                    name="completionDate"
+                    value={formData.completionDate}
+                    onChange={handleChange}
+                    className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">
+                    ROI (%)
+                  </label>
+                  <input
+                    type="number"
+                    name="roi"
+                    step="0.1"
+                    value={formData.roi}
+                    onChange={handleChange}
+                    className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-yellow-300 mb-1">
+                  Payment Plan
+                </label>
+                <textarea
+                  name="paymentPlan"
+                  rows={3}
+                  value={formData.paymentPlan}
+                  onChange={handleChange}
+                  placeholder="e.g., 10% on booking, 40% during construction, 50% on completion"
+                  className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Image Upload */}
+          <div className="border-b border-yellow-400/30 pb-6">
+            <h4 className="text-md font-medium text-yellow-300 mb-4">Property Image</h4>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-yellow-300 mb-1">
+                  Upload Image *
                 </label>
                 <div className="flex items-center space-x-4">
                   <input
@@ -168,7 +399,7 @@ const PropertyForm = ({ property, onSubmit, onCancel }) => {
                   <button
                     type="button"
                     onClick={() => fileInputRef.current.click()}
-                    className="px-4 py-2 bg-yellow-600 text-gray-900 rounded-md hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                    className="px-6 py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-gray-900 rounded-xl hover:from-yellow-300 hover:to-yellow-400 font-medium transition-all duration-300 shadow-lg hover:shadow-xl"
                   >
                     {imageFile ? 'Change Image' : 'Select Image'}
                   </button>
@@ -177,7 +408,7 @@ const PropertyForm = ({ property, onSubmit, onCancel }) => {
                       <img
                         src={imagePreview}
                         alt="Property preview"
-                        className="h-20 w-20 object-cover rounded-md"
+                        className="h-20 w-20 object-cover rounded-xl border border-yellow-400/30"
                       />
                       <button
                         type="button"
@@ -196,266 +427,43 @@ const PropertyForm = ({ property, onSubmit, onCancel }) => {
                   )}
                 </div>
                 {!imagePreview && !imageFile && formData.image && (
-                  <p className="text-sm text-gray-500 mt-1">Current image will be used</p>
+                  <p className="text-sm text-yellow-300/60 mt-1">Current image will be used</p>
                 )}
               </div>
 
-              {/* Type */}
               <div>
-                <label className="block text-sm font-medium text-yellow-300 mb-2">
-                  Property Type *
-                </label>
-                <select
-                  name="type"
-                  required
-                  value={formData.type}
-                  onChange={handleChange}
-                  className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-md px-3 py-2 text-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                >
-                  <option value="exclusive">Exclusive Property</option>
-                  <option value="off-plan">Off-Plan Property</option>
-                </select>
-              </div>
-
-              {/* Price */}
-              <div>
-                <label className="block text-sm font-medium text-yellow-300 mb-2">
-                  Price (AED) *
+                <label className="block text-sm font-medium text-yellow-300 mb-1">
+                  Or Image URL
                 </label>
                 <input
-                  type="number"
-                  name="price"
-                  required
-                  value={formData.price}
+                  type="url"
+                  name="image"
+                  value={formData.image}
                   onChange={handleChange}
-                  className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-md px-3 py-2 text-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                  placeholder="https://example.com/image.jpg"
+                  className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
                 />
-              </div>
-
-              {/* Location */}
-              <div>
-                <label className="block text-sm font-medium text-yellow-300 mb-2">
-                  Location *
-                </label>
-                <input
-                  type="text"
-                  name="location"
-                  required
-                  value={formData.location}
-                  onChange={handleChange}
-                  className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-md px-3 py-2 text-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                />
-              </div>
-
-              {/* Bedrooms */}
-              <div>
-                <label className="block text-sm font-medium text-yellow-300 mb-2">
-                  Bedrooms
-                </label>
-                <input
-                  type="number"
-                  name="bedrooms"
-                  value={formData.bedrooms}
-                  onChange={handleChange}
-                  className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-md px-3 py-2 text-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                />
-              </div>
-
-              {/* Bathrooms */}
-              <div>
-                <label className="block text-sm font-medium text-yellow-300 mb-2">
-                  Bathrooms
-                </label>
-                <input
-                  type="number"
-                  name="bathrooms"
-                  value={formData.bathrooms}
-                  onChange={handleChange}
-                  className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-md px-3 py-2 text-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                />
-              </div>
-
-              {/* Area */}
-              <div>
-                <label className="block text-sm font-medium text-yellow-300 mb-2">
-                  Area (sq ft)
-                </label>
-                <input
-                  type="number"
-                  name="area"
-                  value={formData.area}
-                  onChange={handleChange}
-                  className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-md px-3 py-2 text-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                />
-              </div>
-
-              {/* Status */}
-              <div>
-                <label className="block text-sm font-medium text-yellow-300 mb-2">
-                  Status
-                </label>
-                <select
-                  name="status"
-                  value={formData.status}
-                  onChange={handleChange}
-                  className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-md px-3 py-2 text-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                >
-                  <option value="available">Available</option>
-                  <option value="sold">Sold</option>
-                  <option value="reserved">Reserved</option>
-                </select>
               </div>
             </div>
+          </div>
+        </form>
+      </div>
 
-            {/* Description */}
-            <div>
-              <label className="block text-sm font-medium text-yellow-300 mb-2">
-                Description *
-              </label>
-              <textarea
-                name="description"
-                required
-                rows={4}
-                value={formData.description}
-                onChange={handleChange}
-                className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-md px-3 py-2 text-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-              />
-            </div>
-
-            {/* Image URL */}
-            <div>
-              <label className="block text-sm font-medium text-yellow-300 mb-2">
-                Image URL
-              </label>
-              <input
-                type="url"
-                name="image"
-                value={formData.image}
-                onChange={handleChange}
-                placeholder="https://example.com/image.jpg"
-                className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-md px-3 py-2 text-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-              />
-            </div>
-
-            {/* Features */}
-            <div>
-              <label className="block text-sm font-medium text-yellow-300 mb-2">
-                Features
-              </label>
-              <div className="flex gap-2 mb-2">
-                <input
-                  type="text"
-                  value={newFeature}
-                  onChange={(e) => setNewFeature(e.target.value)}
-                  placeholder="Add a feature"
-                  className="flex-1 bg-gray-900/50 border border-yellow-400/30 rounded-md px-3 py-2 text-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddFeature())}
-                />
-                <button
-                  type="button"
-                  onClick={handleAddFeature}
-                  className="px-4 py-2 bg-yellow-600 text-gray-900 rounded-md hover:bg-yellow-500 font-medium"
-                >
-                  Add
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {formData.features.map((feature, index) => (
-                  <span
-                    key={index}
-                    className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-yellow-400/20 text-yellow-300 border border-yellow-400/30"
-                  >
-                    {feature}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveFeature(index)}
-                      className="ml-2 text-yellow-400 hover:text-yellow-200"
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Off-plan specific fields */}
-            {formData.type === 'off-plan' && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-yellow-300 mb-2">
-                    Developer
-                  </label>
-                  <input
-                    type="text"
-                    name="developer"
-                    value={formData.developer}
-                    onChange={handleChange}
-                    className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-md px-3 py-2 text-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-yellow-300 mb-2">
-                    Completion Date
-                  </label>
-                  <input
-                    type="date"
-                    name="completionDate"
-                    value={formData.completionDate}
-                    onChange={handleChange}
-                    className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-md px-3 py-2 text-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-yellow-300 mb-2">
-                    ROI (%)
-                  </label>
-                  <input
-                    type="number"
-                    name="roi"
-                    step="0.1"
-                    value={formData.roi}
-                    onChange={handleChange}
-                    className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-md px-3 py-2 text-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Payment Plan */}
-            {formData.type === 'off-plan' && (
-              <div>
-                <label className="block text-sm font-medium text-yellow-300 mb-2">
-                  Payment Plan
-                </label>
-                <textarea
-                  name="paymentPlan"
-                  rows={3}
-                  value={formData.paymentPlan}
-                  onChange={handleChange}
-                  placeholder="e.g., 10% on booking, 40% during construction, 50% on completion"
-                  className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-md px-3 py-2 text-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-400"
-                />
-              </div>
-            )}
-
-            {/* Form Actions */}
-            <div className="flex justify-end space-x-3 pt-6 border-t border-yellow-400/30">
-              <button
-                type="button"
-                onClick={onCancel}
-                className="px-4 py-2 border border-yellow-400/30 rounded-md text-yellow-300 hover:bg-gray-800/50"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-yellow-600 text-gray-900 rounded-md hover:bg-yellow-500 font-medium"
-              >
-                {property ? 'Update Property' : 'Create Property'}
-              </button>
-            </div>
-          </form>
-        </div>
+      <div className="modal-footer sticky bottom-0 bg-gray-800 p-6 border-t border-yellow-400/30 rounded-b-2xl">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-6 py-3 border border-yellow-400/30 text-yellow-300 rounded-xl hover:bg-yellow-400/10 transition-all duration-300 backdrop-blur-sm"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          form="propertyForm"
+          className="px-6 py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-gray-900 rounded-xl hover:from-yellow-300 hover:to-yellow-400 font-medium transition-all duration-300 shadow-lg hover:shadow-xl"
+        >
+          {property ? 'Update Property' : 'Create Property'}
+        </button>
       </div>
     </div>
   )

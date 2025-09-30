@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { toast } from 'react-hot-toast'
-import apiService from '../services/api'
+import apiService from '../../services/api'
 
-const ProjectManager = () => {
+const ProjectManagement = () => {
   const [projects, setProjects] = useState([])
+  // No search/filters in admin project listing; show all projects
   const [showForm, setShowForm] = useState(false)
   const [editingProject, setEditingProject] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -29,12 +30,27 @@ const ProjectManager = () => {
       setLoading(true)
       const response = await apiService.getProjects()
 
-      if (response?.success && Array.isArray(response.data)) {
-        setProjects(response.data)
+      let fetched = []
+      if (Array.isArray(response)) {
+        fetched = response
+      } else if (response && Array.isArray(response.data)) {
+        fetched = response.data
+      } else if (response && response.data && Array.isArray(response.data.items)) {
+        fetched = response.data.items
       } else {
-        console.warn('Invalid API response for projects')
-        setProjects([])
+        // Try to find any array payload in response
+        const possibleArray = response && typeof response === 'object' ? Object.values(response).find(v => Array.isArray(v)) : null
+        if (possibleArray) fetched = possibleArray
       }
+
+      // Normalize basic fields used in the admin table
+      const normalized = fetched.map(p => ({
+        ...p,
+        name: p.name || p.title || p.projectName || '',
+        project_types: p.project_types || p.project_type || p.type || ''
+      }))
+
+      setProjects(normalized)
     } catch (error) {
       console.error('Error fetching projects:', error)
       toast.error('Failed to fetch projects')
@@ -77,14 +93,35 @@ const ProjectManager = () => {
         response = await apiService.createProject(submitData)
       }
 
-      if (response.success) {
+  console.warn('createProject response:', response)
+  if (response && response.success) {
         toast.success(editingProject ? 'Project updated successfully' : 'Project created successfully')
         setShowForm(false)
         setEditingProject(null)
         resetForm()
         fetchProjects() // Refresh the list
       } else {
-        toast.error(response.message || 'Failed to save project')
+        // Show server-side validation message when provided
+        let msg = 'Failed to save project'
+        // The API may return various shapes: result.message, result.response_message, result.errors (object), or nested response_data
+        if (response) {
+          if (response.message) msg = response.message
+          else if (response.response_message) msg = response.response_message
+          else if (response.data && response.data.message) msg = response.data.message
+          else if (response.data && response.data.errors) {
+            const errs = response.data.errors
+            // flatten object messages
+            const flattened = Object.keys(errs).map(k => Array.isArray(errs[k]) ? errs[k].join(', ') : String(errs[k])).join(' | ')
+            msg = flattened || msg
+          } else if (response.errors) {
+            const errs = response.errors
+            const flattened = Object.keys(errs).map(k => Array.isArray(errs[k]) ? errs[k].join(', ') : String(errs[k])).join(' | ')
+            msg = flattened || msg
+          } else if (response.data && typeof response.data === 'string') {
+            msg = response.data
+          }
+        }
+        toast.error(msg)
       }
     } catch (error) {
       console.error('Error saving project:', error)
@@ -144,6 +181,8 @@ const ProjectManager = () => {
       completion_date: ''
     })
   }
+
+  
 
   const getStatusBadge = (status) => {
     const statusStyles = {
@@ -399,92 +438,80 @@ const ProjectManager = () => {
         </div>
       )}
 
-      {/* Projects List */}
-      <div className="bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-yellow-400/30">
-        <div className="p-6">
-          <h3 className="text-lg font-semibold text-yellow-300 mb-4">
-            All Projects ({projects.length})
-          </h3>
-          {projects.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="w-24 h-24 mx-auto mb-4 bg-yellow-400/10 rounded-full flex items-center justify-center">
-                <svg className="w-12 h-12 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                </svg>
+      {/* Projects Panel - simple list (no filters/search) */}
+      <div className="bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-yellow-400/30 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-semibold text-yellow-300">All Projects ({projects.length})</h3>
+            <p className="text-yellow-300/70 text-sm">Listing of all projects from the API.</p>
+          </div>
+        </div>
+
+        <div className="bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-yellow-400/30">
+          <div className="p-6">
+            {projects.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="w-24 h-24 mx-auto mb-4 bg-yellow-400/10 rounded-full flex items-center justify-center">
+                  <svg className="w-12 h-12 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                </div>
+                <p className="text-yellow-300/80 text-lg">No projects found</p>
+                <p className="text-yellow-300/60 text-sm">Add a project to get started</p>
               </div>
-              <p className="text-yellow-300/80 text-lg">No projects found</p>
-              <p className="text-yellow-300/60 text-sm">Add your first project to get started</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-yellow-400/30">
-                    <th className="text-left py-3 px-4 font-medium text-yellow-300">Project Name</th>
-                    <th className="text-left py-3 px-4 font-medium text-yellow-300">Location</th>
-                    <th className="text-left py-3 px-4 font-medium text-yellow-300">Type</th>
-                    <th className="text-left py-3 px-4 font-medium text-yellow-300">Units</th>
-                    <th className="text-left py-3 px-4 font-medium text-yellow-300">Status</th>
-                    <th className="text-left py-3 px-4 font-medium text-yellow-300">Launch Date</th>
-                    <th className="text-right py-3 px-4 font-medium text-yellow-300">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {projects.map((project) => (
-                    <tr key={project._id} className="border-b border-yellow-400/10 hover:bg-yellow-400/5 transition-colors">
-                      <td className="py-4 px-4">
-                        <div>
-                          <p className="text-yellow-100 font-medium">{project.name || project.title}</p>
-                          <p className="text-yellow-300/70 text-sm">{project.description}</p>
-                        </div>
-                      </td>
-                      <td className="py-4 px-4 text-yellow-100">
-                        {project.location}
-                      </td>
-                      <td className="py-4 px-4 text-yellow-100">
-                        {project.project_types || project.project_type}
-                      </td>
-                      <td className="py-4 px-4 text-yellow-100">
-                        {project.total_units || 0}
-                      </td>
-                      <td className="py-4 px-4">
-                        {getStatusBadge(project.project_statuses || project.status)}
-                      </td>
-                      <td className="py-4 px-4 text-yellow-100">
-                        {formatDate(project.launch_date)}
-                      </td>
-                      <td className="py-4 px-4 text-right">
-                        <div className="flex items-center justify-end space-x-2">
-                          <button
-                            onClick={() => handleEdit(project)}
-                            className="p-2 text-yellow-400 hover:bg-yellow-400/10 rounded-lg transition-colors"
-                            title="Edit Project"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => handleDelete(project._id)}
-                            className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
-                            title="Delete Project"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        </div>
-                      </td>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-yellow-400/30">
+                      <th className="text-left py-3 px-4 font-medium text-yellow-300">Project Name</th>
+                      <th className="text-left py-3 px-4 font-medium text-yellow-300">Location</th>
+                      <th className="text-left py-3 px-4 font-medium text-yellow-300">Type</th>
+                      <th className="text-left py-3 px-4 font-medium text-yellow-300">Units</th>
+                      <th className="text-left py-3 px-4 font-medium text-yellow-300">Status</th>
+                      <th className="text-left py-3 px-4 font-medium text-yellow-300">Launch Date</th>
+                      <th className="text-right py-3 px-4 font-medium text-yellow-300">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  </thead>
+                  <tbody>
+                    {projects.map((project) => (
+                      <tr key={project._id || project.id} className="border-b border-yellow-400/10 hover:bg-yellow-400/5 transition-colors">
+                        <td className="py-4 px-4">
+                          <div>
+                            <p className="text-yellow-100 font-medium">{project.name || project.title}</p>
+                            <p className="text-yellow-300/70 text-sm">{project.description}</p>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4 text-yellow-100">{project.location}</td>
+                        <td className="py-4 px-4 text-yellow-100">{project.project_types || project.project_type || project.type}</td>
+                        <td className="py-4 px-4 text-yellow-100">{project.total_units || project.units || 0}</td>
+                        <td className="py-4 px-4">{getStatusBadge(project.project_statuses || project.status)}</td>
+                        <td className="py-4 px-4 text-yellow-100">{formatDate(project.launch_date)}</td>
+                        <td className="py-4 px-4 text-right">
+                          <div className="flex items-center justify-end space-x-2">
+                            <button onClick={() => handleEdit(project)} className="p-2 text-yellow-400 hover:bg-yellow-400/10 rounded-lg transition-colors" title="Edit Project">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                            <button onClick={() => handleDelete(project._id || project.id)} className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors" title="Delete Project">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
   )
 }
 
-export default ProjectManager
+export default ProjectManagement
