@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import apiService from '../services/api'
-import seededProperties from '../data/properties.js'
 import { toast } from 'react-hot-toast'
 import { useLocation } from 'react-router-dom'
 
@@ -170,13 +169,7 @@ const Projects = () => {
           }
         }
 
-        // If still empty, use seeded static properties bundled with the app
-        if (!allProperties || allProperties.length === 0) {
-          if (Array.isArray(seededProperties) && seededProperties.length > 0) {
-            console.warn('Using bundled seededProperties as final fallback')
-            allProperties = seededProperties
-          }
-        }
+        // No bundled fallback here; rely on backend or localStorage fallbacks
 
         // Normalize fields for each property to ensure filters work (title, projectName, price, location, _id)
         const normalized = allProperties.map(p => ({

@@ -79,11 +79,16 @@ const ProjectManagement = () => {
         bedrooms: parseInt(formData.bedrooms) || 0,
         area: formData.area,
         description: formData.description,
-        total_units: parseInt(formData.total_units) || 0,
+        // Server expects total_units as a string type per validation error. Send both typed and alias forms.
+        total_units: String(formData.total_units || ''),
+        totalUnits: String(formData.total_units || ''),
         project_statuses: formData.project_statuses,
         launch_date: formData.launch_date,
         completion_date: formData.completion_date
       }
+
+      // Include alias for location if backend expects 'location_name'
+      if (formData.location && !submitData.location_name) submitData.location_name = formData.location
 
       let response
       if (editingProject) {
@@ -93,8 +98,7 @@ const ProjectManagement = () => {
         response = await apiService.createProject(submitData)
       }
 
-  console.warn('createProject response:', response)
-  if (response && response.success) {
+      if (response && response.success) {
         toast.success(editingProject ? 'Project updated successfully' : 'Project created successfully')
         setShowForm(false)
         setEditingProject(null)
@@ -102,13 +106,36 @@ const ProjectManagement = () => {
         fetchProjects() // Refresh the list
       } else {
         // Show server-side validation message when provided
-        let msg = 'Failed to save project'
+          let msg = 'Failed to save project'
         // The API may return various shapes: result.message, result.response_message, result.errors (object), or nested response_data
-        if (response) {
+    if (response) {
+            // If server returns response_data with details, try to extract messages
+            if (response.data && response.data.response_data) {
+              const rd = response.data.response_data
+              if (Array.isArray(rd) && rd.length > 0) {
+                // Try to map common patterns
+                const mapped = rd.map(item => {
+                  if (typeof item === 'string') return item
+                  if (item.message) return item.message
+                  if (item.msg) return item.msg
+                  if (item.field && item.message) return `${item.field}: ${item.message}`
+                  return JSON.stringify(item)
+                }).join(' | ')
+                msg = mapped || msg
+              } else if (typeof rd === 'object') {
+                // flatten object
+                const flattened = Object.keys(rd).map(k => {
+                  const v = rd[k]
+                  if (Array.isArray(v)) return `${k}: ${v.join(', ')}`
+                  return `${k}: ${String(v)}`
+                }).join(' | ')
+                msg = flattened || msg
+              }
+            }
           if (response.message) msg = response.message
           else if (response.response_message) msg = response.response_message
           else if (response.data && response.data.message) msg = response.data.message
-          else if (response.data && response.data.errors) {
+            else if (response.data && response.data.errors) {
             const errs = response.data.errors
             // flatten object messages
             const flattened = Object.keys(errs).map(k => Array.isArray(errs[k]) ? errs[k].join(', ') : String(errs[k])).join(' | ')
@@ -234,6 +261,8 @@ const ProjectManagement = () => {
           <span>Add New Project</span>
         </button>
       </div>
+
+
 
       {/* Inline Add/Edit Form */}
       {showForm && (

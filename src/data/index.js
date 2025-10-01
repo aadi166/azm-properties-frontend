@@ -1,5 +1,4 @@
 // Central export file for all static data
-export { default as properties } from './properties.js';
 export { default as blogs } from './blogs.js';
 export { default as partners } from './partners.js';
 export { default as testimonials } from './testimonials.js';
@@ -7,8 +6,20 @@ export { default as contacts } from './contacts.js';
 
 // Helper functions for data manipulation
 export const getPropertyById = (id) => {
-  const { properties } = require('./properties.js');
-  return properties.find(property => property._id === id || property.id === id);
+  try {
+    // attempt to load static properties if present
+    // use require to avoid bundling if file is removed
+    // if not available, return null
+    // eslint-disable-next-line import/no-dynamic-require, global-require
+    const mod = require('./properties.js');
+    const properties = mod && (mod.default || mod.properties || mod)
+    if (Array.isArray(properties)) {
+      return properties.find(property => property._id === id || property.id === id) || null
+    }
+  } catch (e) {
+    // properties.js not present or failed to load
+  }
+  return null
 };
 
 export const getBlogBySlug = (slug) => {
@@ -42,11 +53,25 @@ export const getActivePartners = () => {
 };
 
 export const getPropertiesByCategory = (category) => {
-  const { properties } = require('./properties.js');
-  return properties.filter(property => property.category === category);
+  try {
+    // eslint-disable-next-line import/no-dynamic-require, global-require
+    const mod = require('./properties.js');
+    const properties = mod && (mod.default || mod.properties || mod)
+    if (Array.isArray(properties)) return properties.filter(property => property.category === category)
+  } catch (e) {
+    // missing static properties
+  }
+  return []
 };
 
 export const getFeaturedProperties = () => {
-  const { properties } = require('./properties.js');
-  return properties.filter(property => property.featured === true);
+  try {
+    // eslint-disable-next-line import/no-dynamic-require, global-require
+    const mod = require('./properties.js');
+    const properties = mod && (mod.default || mod.properties || mod)
+    if (Array.isArray(properties)) return properties.filter(property => property.featured === true)
+  } catch (e) {
+    // missing static properties
+  }
+  return []
 };

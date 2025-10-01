@@ -1,5 +1,5 @@
 // Static API service - returns static data instead of making HTTP requests
-import { properties, blogs, partners, testimonials, contacts } from '../data/index.js';
+import { blogs, partners, testimonials, contacts } from '../data/index.js';
 
 // Global API configuration
 const API_CONFIG = {
@@ -41,12 +41,10 @@ const STORAGE_KEYS = {
 // Initialize local storage with static data if not exists
 const initializeLocalStorage = () => {
   console.log('🚀 Initializing localStorage...');
-  console.log('📋 Imported properties:', properties);
-  console.log('📊 Properties count:', properties ? properties.length : 0);
   
   if (!localStorage.getItem(STORAGE_KEYS.PROPERTIES)) {
-    console.log('💾 Storing properties to localStorage...');
-    localStorage.setItem(STORAGE_KEYS.PROPERTIES, JSON.stringify(properties));
+    // Do NOT seed properties from static data; prefer API-backed properties only
+    console.log('ℹ️ Skipping seeding properties to localStorage to ensure dynamic backend data is used');
   } else {
     console.log('✅ Properties already exist in localStorage');
   }
@@ -115,34 +113,54 @@ class StaticApiService {
 
   // Properties API methods
   async getProperties(filters = {}) {
-    await simulateDelay();
-    let propertiesData = getFromStorage(STORAGE_KEYS.PROPERTIES);
-    
-    console.log('🔍 getProperties called with filters:', filters);
-    console.log('📦 Raw properties data from storage:', propertiesData);
-    console.log('📊 Properties count:', propertiesData ? propertiesData.length : 0);
-    
-    // Apply filters
-    if (filters.category && filters.category !== 'all') {
-      propertiesData = propertiesData.filter(p => p.category === filters.category);
+    // Require admin token for property admin read operations
+    const token = localStorage.getItem(STORAGE_KEYS.ADMIN_TOKEN) || localStorage.getItem('accessToken');
+    if (!token) {
+      return this.createResponse([], false, 'Admin token not found. Please login to view properties.');
     }
-    if (filters.location && filters.location !== 'all') {
-      propertiesData = propertiesData.filter(p => p.location.toLowerCase().includes(filters.location.toLowerCase()));
+
+    try {
+      const endpoint = `${API_CONFIG.BASE_URL}/api/property/read`;
+      const resp = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-session-key': token
+        },
+        body: JSON.stringify(filters || {})
+      });
+
+      if (!resp.ok) {
+        const text = await resp.text().catch(() => null);
+        throw new Error(`HTTP ${resp.status} - ${text}`);
+      }
+
+      const result = await resp.json().catch(() => null);
+      const raw = (result && (result.response_data || result.data || result.properties)) || [];
+      const items = Array.isArray(raw) ? raw : [];
+
+      const normalized = items.map(p => ({
+        _id: p.id || p._id,
+        id: p.id || p._id,
+        title: p.title || p.name || '',
+        description: p.description || p.desc || '',
+        price: p.price || p.amount || 0,
+        location: p.location || p.address || '',
+        image: p.image || (p.images && p.images[0]) || null,
+        type: p.type || p.property_type || p.propertyType || 'exclusive',
+        bedrooms: p.bedrooms || p.bedroom_count || 0,
+        bathrooms: p.bathrooms || p.bathroom_count || 0,
+        area: p.area || p.size || p.sqft || 0,
+        status: p.status || 'available',
+        createdAt: p.created_on ? new Date(p.created_on).toISOString() : (p.createdAt || new Date().toISOString()),
+        ...p
+      }));
+
+      return { data: normalized, success: true };
+    } catch (error) {
+      console.error('Error fetching properties from API:', error && error.message ? error.message : error);
+      return this.createResponse([], false, error && error.message ? error.message : 'Failed to fetch properties from API');
     }
-    if (filters.propertyType && filters.propertyType !== 'all') {
-      propertiesData = propertiesData.filter(p => p.propertyType === filters.propertyType);
-    }
-    if (filters.minPrice) {
-      propertiesData = propertiesData.filter(p => p.price >= parseInt(filters.minPrice));
-    }
-    if (filters.maxPrice) {
-      propertiesData = propertiesData.filter(p => p.price <= parseInt(filters.maxPrice));
-    }
-    
-    console.log('✅ Filtered properties data:', propertiesData);
-    console.log('📈 Final count:', propertiesData ? propertiesData.length : 0);
-    
-    return this.createResponse(propertiesData);
   }
 
   async getPropertyById(id) {
@@ -170,20 +188,73 @@ class StaticApiService {
   }
 
   async createProperty(propertyData) {
-    await simulateDelay();
-    const propertiesData = getFromStorage(STORAGE_KEYS.PROPERTIES);
-    const newProperty = {
-      ...propertyData,
-      _id: generateId(),
-      id: generateId(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    
-    propertiesData.push(newProperty);
-    saveToStorage(STORAGE_KEYS.PROPERTIES, propertiesData);
-    
-    return this.createResponse(newProperty, true, 'Property created successfully');
+    // Require admin token for property creation
+    const token = localStorage.getItem(STORAGE_KEYS.ADMIN_TOKEN) || localStorage.getItem('accessToken');
+    if (!token) {
+      return this.createResponse(null, false, 'Admin token not found. Please login to create properties.');
+    }
+
+    try {
+      const endpoint = `${API_CONFIG.BASE_URL}/api/property/create`;
+
+      // Ensure body is FormData (for file upload)
+      let body = propertyData;
+      if (!(propertyData instanceof FormData)) {
+        const fd = new FormData();
+        Object.keys(propertyData).forEach(key => {
+          const v = propertyData[key];
+          if (Array.isArray(v)) {
+            v.forEach(item => fd.append(key, item));
+          } else if (v instanceof File) {
+            fd.append(key, v);
+          } else if (v !== undefined && v !== null) {
+            fd.append(key, v);
+          } else {
+            fd.append(key, '');
+          }
+        });
+        body = fd;
+      }
+
+      const resp = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'x-session-key': token
+          // Do NOT set Content-Type for FormData
+        },
+        body
+      });
+
+      const result = await resp.json().catch(() => null);
+      if (resp.ok && result && (result.response_code === 200 || result.success === true)) {
+        const created = result.response_data || result.data || {};
+        const prop = {
+          _id: created.id || created._id || generateId(),
+          id: created.id || created._id || generateId(),
+          title: created.title || created.name || propertyData.title || '',
+          description: created.description || propertyData.description || '',
+          price: created.price || propertyData.price || 0,
+          location: created.location || propertyData.location || '',
+          image: created.image || propertyData.image || null,
+          type: created.type || propertyData.type || 'exclusive',
+          bedrooms: created.bedrooms || propertyData.bedrooms || 0,
+          bathrooms: created.bathrooms || propertyData.bathrooms || 0,
+          area: created.area || propertyData.area || 0,
+          status: created.status || propertyData.status || 'available',
+          createdAt: created.created_on ? new Date(created.created_on).toISOString() : new Date().toISOString(),
+          updatedAt: created.updated_on ? new Date(created.updated_on).toISOString() : new Date().toISOString(),
+          ...created
+        };
+
+        return this.createResponse(prop, true, result.response_message || 'Property created successfully');
+      }
+
+      const errMsg = (result && (result.response_message || result.message)) || `HTTP ${resp.status}`;
+      return this.createResponse(result || { message: errMsg }, false, errMsg || 'Failed to create property');
+    } catch (error) {
+      console.error('Error creating property via API:', error);
+      return this.createResponse({ error: error && error.message ? error.message : String(error) }, false, error && error.message ? error.message : 'Network error while creating property');
+    }
   }
 
   async updateProperty(id, propertyData) {
@@ -205,15 +276,32 @@ class StaticApiService {
   }
 
   async deleteProperty(id) {
-    await simulateDelay();
-    const propertiesData = getFromStorage(STORAGE_KEYS.PROPERTIES);
-    const filteredProperties = propertiesData.filter(p => p._id !== id && p.id !== id);
-    
-    if (filteredProperties.length < propertiesData.length) {
-      saveToStorage(STORAGE_KEYS.PROPERTIES, filteredProperties);
-      return this.createResponse(null, true, 'Property deleted successfully');
-    } else {
-      throw new Error('Property not found');
+    const token = localStorage.getItem(STORAGE_KEYS.ADMIN_TOKEN) || localStorage.getItem('accessToken');
+    if (!token) {
+      return this.createResponse(null, false, 'Admin token not found. Please login to delete properties.');
+    }
+
+    try {
+      const endpoint = `${API_CONFIG.BASE_URL}/api/property/delete`;
+      const resp = await fetch(endpoint, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-session-key': token
+        },
+        body: JSON.stringify({ id })
+      });
+
+      const result = await resp.json().catch(() => null);
+      if (resp.ok && result && (result.response_code === 200 || result.success === true)) {
+        return this.createResponse(null, true, result.response_message || 'Property deleted successfully');
+      }
+
+      const errMsg = (result && (result.response_message || result.message)) || `HTTP ${resp.status}`;
+      return this.createResponse(null, false, errMsg || 'Failed to delete property');
+    } catch (error) {
+      console.error('Error deleting property via API:', error);
+      return this.createResponse(null, false, error && error.message ? error.message : 'Network error while deleting property');
     }
   }
 
@@ -300,13 +388,24 @@ class StaticApiService {
       const endpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.PROJECT_CREATE}`;
       const token = localStorage.getItem(STORAGE_KEYS.ADMIN_TOKEN) || localStorage.getItem('accessToken');
 
+      // Send only x-session-key header as requested by backend; do not set Content-Type so
+      // the browser can set it for FormData (multipart) requests. If projectData is a FormData
+      // instance, send as-is; otherwise send JSON string without setting Content-Type header.
+      const headers = {
+        'x-session-key': token || ''
+      }
+
+      let bodyToSend = projectData
+      if (!(projectData instanceof FormData)) {
+        // Send JSON body and set Content-Type so backend can parse it
+        headers['Content-Type'] = 'application/json'
+        bodyToSend = JSON.stringify(projectData)
+      }
+
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-session-key': token || ''
-        },
-        body: JSON.stringify(projectData)
+        headers,
+        body: bodyToSend
       });
 
       const result = await response.json().catch(() => null);

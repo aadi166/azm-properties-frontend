@@ -611,18 +611,9 @@ const DeveloperManagement = () => {
                   {developers.map((developer) => (
                     <tr key={developer._id} className="border-b border-yellow-400/10 hover:bg-yellow-400/5 transition-colors">
                       <td className="py-4 px-4">
-                        <div className="flex items-center space-x-3">
-                          {developer.logo && (
-                            <img
-                              src={`http://localhost:5003${developer.logo}`}
-                              alt={developer.name}
-                              className="w-12 h-12 rounded-lg object-cover border border-yellow-400/30"
-                            />
-                          )}
-                          <div>
-                            <p className="text-yellow-100 font-medium">{developer.name}</p>
-                            <p className="text-yellow-300/70 text-sm">{developer.description}</p>
-                          </div>
+                        <div>
+                          <p className="text-yellow-100 font-medium">{developer.name}</p>
+                          <p className="text-yellow-300/70 text-sm">{developer.description}</p>
                         </div>
                       </td>
                       <td className="py-4 px-4 text-yellow-100">
