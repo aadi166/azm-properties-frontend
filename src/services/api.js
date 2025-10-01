@@ -8,6 +8,9 @@ const API_CONFIG = {
     LOGIN: '/api/users/login/web',
     BLOG_CREATE: '/api/blog/create',
     BLOG_READ: '/api/blog/read',
+    PROPERTY_READ: '/api/property/read',
+    PROPERTY_CREATE: '/api/property/create',
+    PROPERTY_DELETE: '/api/property/delete',
     TESTIMONIAL_CREATE: '/api/testimonial/create',
     TESTIMONIAL_READ: '/api/testimonial/read',
     TESTIMONIAL_DELETE: '/api/testimonial/delete',
@@ -113,21 +116,19 @@ class StaticApiService {
 
   // Properties API methods
   async getProperties(filters = {}) {
-    // Require admin token for property admin read operations
+    // Allow public property reads. If an admin token exists, include it; otherwise call public endpoint without auth.
     const token = localStorage.getItem(STORAGE_KEYS.ADMIN_TOKEN) || localStorage.getItem('accessToken');
-    if (!token) {
-      return this.createResponse([], false, 'Admin token not found. Please login to view properties.');
-    }
 
     try {
-      const endpoint = `${API_CONFIG.BASE_URL}/api/property/read`;
+      // Build GET endpoint and append filters as query string (no body)
+      const qs = (filters && Object.keys(filters).length) ? `?${new URLSearchParams(filters).toString()}` : '';
+      const endpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.PROPERTY_READ}${qs}`;
+      const headers = { 'Accept': 'application/json' };
+      if (token) headers['x-session-key'] = token;
+
       const resp = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-session-key': token
-        },
-        body: JSON.stringify(filters || {})
+        method: 'GET',
+        headers
       });
 
       if (!resp.ok) {
@@ -195,7 +196,7 @@ class StaticApiService {
     }
 
     try {
-      const endpoint = `${API_CONFIG.BASE_URL}/api/property/create`;
+  const endpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.PROPERTY_CREATE}`;
 
       // Ensure body is FormData (for file upload)
       let body = propertyData;
@@ -282,7 +283,7 @@ class StaticApiService {
     }
 
     try {
-      const endpoint = `${API_CONFIG.BASE_URL}/api/property/delete`;
+  const endpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.PROPERTY_DELETE}`;
       const resp = await fetch(endpoint, {
         method: 'DELETE',
         headers: {

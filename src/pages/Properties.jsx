@@ -342,173 +342,62 @@ const Properties = () => {
               </button>
             </div>
           ) : (
-            <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8' : 'space-y-8'}>
-              {currentProperties.map((property, index) => (
-                <div
-                  key={property.id}
-                  className={`group cursor-pointer transform transition-all duration-500 hover:scale-105 ${
-                    viewMode === 'list' ? 'flex bg-gray-900/50 backdrop-blur-sm rounded-2xl overflow-hidden border border-gold-500/20 hover:border-gold-400/40' : 'bg-gray-900/50 backdrop-blur-sm rounded-2xl overflow-hidden border border-gold-500/20 hover:border-gold-400/40'
-                  }`}
-                  onClick={() => openPropertyDetail(property)}
-                >
-                  {/* Property Image */}
-                  <div className={`relative overflow-hidden ${viewMode === 'list' ? 'w-1/3' : 'h-64'}`}>
-                    {/* Avoid rendering images for project/off-plan entries; show image only for standard properties */}
-                    {(property.category !== 'off-plan' && (property.images && property.images[0] || property.image)) ? (
-                      <img
-                        src={property.images && property.images[0] ? property.images[0] : property.image}
-                        alt={property.title}
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                        onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80' }}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-900 to-gray-800 text-gold-400 font-semibold text-lg">
-                        {property.title || property.name}
-                      </div>
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent"></div>
-                    
-                    {/* Property Type Badge */}
-                    <div className="absolute top-4 left-4 flex flex-col gap-2">
-                      <span className="px-3 py-1 bg-gradient-to-r from-purple-600 to-purple-500 text-white text-xs font-semibold rounded-full">
-                        EXCLUSIVE
-                      </span>
-                      {/* Construction Status Badge */}
-                      {property.constructionStatus && (
-                        <span className={`px-3 py-1 text-white text-xs font-semibold rounded-full ${
-                          property.constructionStatus.toLowerCase() === 'ready' ? 'bg-gradient-to-r from-green-600 to-green-500' :
-                          property.constructionStatus.toLowerCase() === 'in-construction' ? 'bg-gradient-to-r from-orange-600 to-orange-500' :
-                          'bg-gradient-to-r from-purple-600 to-purple-500'
-                        }`}>
-                          {property.constructionStatus}
-                        </span>
-                      )}
-
-                    </div>
-                    
-                    {/* Action Buttons */}
-                    <div className="absolute top-4 right-4 flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                      <button
-                        onClick={(e) => handleLike(e, property)}
-                        className={`p-2 backdrop-blur-sm rounded-full transition-colors ${
-                          wishlistItems.has(property._id)
-                            ? 'bg-red-500 text-white hover:bg-red-600'
-                            : 'bg-black/50 text-white hover:bg-gold-500 hover:text-black'
-                        }`}
-                      >
-                        <svg className="w-4 h-4" fill={wishlistItems.has(property._id) ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={(e) => handleShare(e, property)}
-                        className="p-2 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-gold-500 hover:text-black transition-colors"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
-                        </svg>
-                      </button>
-                    </div>
-
-                    {/* Price Badge */}
-                    <div className="absolute bottom-4 left-4">
-                      <span className="px-4 py-2 bg-gradient-to-r from-gold-600 to-yellow-500 text-black font-bold rounded-full text-sm">
-                        {property.price ? `${(property.price / 1000000).toFixed(1)}M AED` : 'Price on Request'}
-                      </span>
-                    </div>
-
-                  </div>
-                  
-                  {/* Property Details */}
-                  <div className={`p-6 ${viewMode === 'list' ? 'flex-1' : ''}`}>
-                    <div className="mb-4">
-                      <h3 className="text-xl font-bold text-white mb-2 group-hover:text-gold-400 transition-colors">
-                        {property.title}
-                      </h3>
-                      <p className="text-gold-400 text-sm font-medium mb-1">
-                        {property.projectName}
-                      </p>
-                      <p className="text-gray-400 text-sm flex items-center">
-                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        {property.location}
-                      </p>
-                    </div>
-
-                    {/* Property Features */}
-                    <div className="grid grid-cols-3 gap-4 mb-4">
-                      <div className="text-center">
-                        <div className="text-gold-400 font-semibold">{property.bedrooms}</div>
-                        <div className="text-gray-400 text-xs">Bedrooms</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-gold-400 font-semibold">{property.bathrooms}</div>
-                        <div className="text-gray-400 text-xs">Bathrooms</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-gold-400 font-semibold">{property.area || 'N/A'}</div>
-                        <div className="text-gray-400 text-xs">Sq Ft</div>
-                      </div>
-                    </div>
-
-                    {/* Key Highlights */}
-                    <div className="mb-4">
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        {property.completionDate && (
-                          <span className="px-2 py-1 bg-gray-800/50 text-gold-400 text-xs rounded-lg border border-gold-500/20">
-                            📅 {property.completionDate}
-                          </span>
-                        )}
-                        {property.paymentPlan && (
-                          <span className="px-2 py-1 bg-gray-800/50 text-gold-400 text-xs rounded-lg border border-gold-500/20">
-                            💳 {property.paymentPlan}
-                          </span>
-                        )}
-                        {property.developer && (
-                          <span className="px-2 py-1 bg-gray-800/50 text-gold-400 text-xs rounded-lg border border-gold-500/20">
-                            🏗️ {property.developer}
-                          </span>
-                        )}
-                        {property.roi && (
-                          <span className="px-2 py-1 bg-gray-800/50 text-green-400 text-xs rounded-lg border border-green-500/20">
-                            📈 {property.roi}% ROI
-                          </span>
-                        )}
-                      </div>
-                      
-                      {/* Key Features */}
-                      {property.keyFeatures && property.keyFeatures.length > 0 && (
-                        <div className="space-y-1">
-                          {property.keyFeatures.slice(0, 3).map((feature, index) => (
-                            <div key={index} className="flex items-center text-xs text-gray-300">
-                              <span className="w-1 h-1 bg-gold-400 rounded-full mr-2"></span>
-                              {feature}
+            <div className="bg-black shadow rounded-lg overflow-hidden border border-yellow-400/30">
+              <div className="px-6 py-4 border-b border-yellow-400/30">
+                <h3 className="text-lg font-medium text-green-400">Properties ({filteredProperties.length})</h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-yellow-400/30">
+                  <thead className="bg-gray-900">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-yellow-400 uppercase tracking-wider">Property</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-yellow-400 uppercase tracking-wider">Type</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-yellow-400 uppercase tracking-wider">Price</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-yellow-400 uppercase tracking-wider">Location</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-yellow-400 uppercase tracking-wider">Details</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-yellow-400 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-yellow-400 uppercase tracking-wider">Created</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-yellow-400 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-black divide-y divide-yellow-400/30">
+                    {currentProperties.map((property) => (
+                      <tr key={property._id || property.id} className="hover:bg-gray-800">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-12 w-12 flex items-center justify-center">
+                              {property.image ? (
+                                <div title={typeof property.image === 'string' ? property.image : ''} className="px-2 py-1 rounded-lg bg-gray-700 text-xs text-yellow-300 max-w-full truncate">{typeof property.image === 'string' ? property.image.split('/').pop() : 'Uploaded'}</div>
+                              ) : (
+                                <div className="h-10 w-10 rounded-lg bg-gray-700 flex items-center justify-center"><span className="text-yellow-400 text-xs">No Image</span></div>
+                              )}
                             </div>
-                          ))}
-                          {property.keyFeatures.length > 3 && (
-                            <div className="text-xs text-gold-400">
-                              +{property.keyFeatures.length - 3} more features
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-yellow-300 max-w-xs truncate">{property.title}</div>
+                              <div className="text-sm text-yellow-300/70 max-w-xs truncate">{property.description}</div>
                             </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* View Details Button */}
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openPropertyDetail(property);
-                      }}
-                      className="w-full py-3 bg-gradient-to-r from-gold-600 to-yellow-500 text-black font-semibold rounded-xl hover:from-gold-700 hover:to-yellow-600 transition-all duration-300 transform hover:scale-105"
-                    >
-                      View Property Details
-                    </button>
-                  </div>
-                </div>
-              ))}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap"><span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${property.type === 'off-plan' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>{property.type === 'off-plan' ? 'Off-Plan' : 'Exclusive'}</span></td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-yellow-300">{property.price ? new Intl.NumberFormat('en-AE',{style:'currency',currency:'AED',minimumFractionDigits:0}).format(property.price) : 'N/A'}</div>
+                          {property.roi && <div className="text-sm text-green-400">ROI: {property.roi}%</div>}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap"><div className="text-sm text-yellow-300">{property.location}</div></td>
+                        <td className="px-6 py-4 whitespace-nowrap"><div className="text-sm text-yellow-300">{property.bedrooms && `${property.bedrooms} bed`}{property.bedrooms && property.bathrooms && ' • '}{property.bathrooms && `${property.bathrooms} bath`}{property.area && <div className="text-sm text-yellow-300/70">{Number(property.area).toLocaleString()} sq ft</div>}</div></td>
+                        <td className="px-6 py-4 whitespace-nowrap"><span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${property.status === 'available' ? 'bg-green-100 text-green-800' : property.status === 'sold' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>{(property.status || 'Unknown').charAt(0).toUpperCase() + (property.status || '').slice(1)}</span></td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-yellow-300/70">{property.createdAt ? new Date(property.createdAt).toLocaleDateString() : 'N/A'}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <div className="flex justify-end space-x-2">
+                            <button onClick={() => openPropertyDetail(property)} className="text-yellow-400 hover:text-yellow-300 transition-colors flex items-center space-x-1 mr-3"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg><span>View</span></button>
+                            <button onClick={(e) => { e.stopPropagation(); handleLike(e, property); }} className={`text-red-400 hover:text-red-300 transition-colors flex items-center space-x-1`}><svg className="w-4 h-4" fill={wishlistItems.has(property._id) ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg><span>{wishlistItems.has(property._id) ? 'Saved' : 'Save'}</span></button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 

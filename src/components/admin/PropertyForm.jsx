@@ -1,10 +1,4 @@
-// PropertyForm component removed. Functionality merged into PropertyManagement.jsx.
-// This file is kept as a lightweight stub for backward compatibility with any imports.
-import React from 'react'
-
-const PropertyForm = () => {
-  console.warn('PropertyForm component is removed. Use PropertyManagement instead.')
-  return null
-}
-
-export default PropertyForm
+// PropertyForm has been removed from the codebase per project cleanup on 2025-10-01.
+// If you see an import of this file, update the import to `PropertyManagement`.
+// This file intentionally throws when imported to make removal obvious during development.
+throw new Error('PropertyForm has been removed; import PropertyManagement instead');
