@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import apiService from '../services/api.js'
 import TrustedDevelopers from '../components/TrustedDevelopers'
 import { countryCodes } from '../data/countryCodes'
@@ -24,6 +24,9 @@ const Home = () => {
   const [blogPosts, setBlogPosts] = useState([])
   const [allBlogs, setAllBlogs] = useState([])
   const [currentBlogIndex, setCurrentBlogIndex] = useState(0)
+  const [activeBlog, setActiveBlog] = useState(null) // blog to show in modal
+  const [publishedProjects, setPublishedProjects] = useState([])
+  const [activeProject, setActiveProject] = useState(null)
   // keep minimal state for home
   
 
@@ -149,6 +152,33 @@ const Home = () => {
     }
   }
 
+  // Fetch projects for highlighted projects section
+  const fetchPublishedProjects = async () => {
+    try {
+      const res = await apiService.getProjects({ limit: 1000 })
+      let items = []
+      if (Array.isArray(res)) items = res
+      else if (res && Array.isArray(res.data)) items = res.data
+      else if (res && res.data && Array.isArray(res.data.items)) items = res.data.items
+      else {
+        const possibleArray = res && typeof res === 'object' ? Object.values(res).find(v => Array.isArray(v)) : null
+        if (possibleArray) items = possibleArray
+      }
+
+      const published = (items || []).filter(p => p.published !== false)
+      // Normalize image property
+      const normalized = published.map(p => ({
+        ...p,
+        title: p.title || p.name || '',
+        image: p.image || (p.images && p.images.length ? p.images[0] : null)
+      }))
+      setPublishedProjects(normalized.slice(0, 3))
+    } catch (error) {
+      console.error('Error fetching projects for highlighted section', error)
+      setPublishedProjects([])
+    }
+  }
+
   // Fetch blogs from API
   const fetchBlogs = async () => {
     try {
@@ -243,7 +273,8 @@ const Home = () => {
 
   // Property click handler
   const handlePropertyClick = (property) => {
-    navigate(`/property/${property._id || property.id}`)
+    // open quick-view modal instead of navigation
+    setActiveProject(property)
   }
 
   // Initialize data
@@ -251,6 +282,7 @@ const Home = () => {
     fetchPartners()
     fetchBlogs()
     fetchTestimonials()
+    fetchPublishedProjects()
   }, [])
 
   // Refresh blogs when window gains focus (user returns from admin panel)
@@ -264,9 +296,14 @@ const Home = () => {
     // Listen for testimonial updates dispatched from admin panel
     const handleTestimonialsUpdated = () => fetchTestimonials()
     window.addEventListener('testimonialsUpdated', handleTestimonialsUpdated)
+    // Listen for projects updates dispatched from admin (publish/unpublish)
+    const handleProjectsUpdated = () => fetchPublishedProjects()
+    window.addEventListener('projectsUpdated', handleProjectsUpdated)
+
     return () => {
       window.removeEventListener('focus', handleFocus)
       window.removeEventListener('testimonialsUpdated', handleTestimonialsUpdated)
+      window.removeEventListener('projectsUpdated', handleProjectsUpdated)
     }
   }, [])
 
@@ -285,10 +322,12 @@ const Home = () => {
   useEffect(() => {
     const fetchProperties = async () => {
       try {
-        const result = await apiService.getProperties()
-        if (result.success && Array.isArray(result.data)) {
-          const exclusive = result.data.filter(property => property.category === 'exclusive')
-          const offPlan = result.data.filter(property => property.category === 'off-plan')
+      const result = await apiService.getProperties()
+      if (result.success && Array.isArray(result.data)) {
+        // Only show properties that are published (published !== false)
+        const items = result.data.filter(p => p && p.published !== false)
+        const exclusive = items.filter(property => property.category === 'exclusive')
+        const offPlan = items.filter(property => property.category === 'off-plan')
           setAllExclusiveProperties(exclusive)
           setAllOffPlanProperties(offPlan)
           setExclusiveProperties(exclusive.slice(0, 3))
@@ -311,6 +350,13 @@ const Home = () => {
     }
     
     fetchProperties()
+    // Listen for property updates dispatched from admin panel
+    const handlePropertiesUpdated = () => fetchProperties()
+    window.addEventListener('propertiesUpdated', handlePropertiesUpdated)
+
+    return () => {
+      window.removeEventListener('propertiesUpdated', handlePropertiesUpdated)
+    }
   }, [])
 
   // Developer navigation handled in TrustedDevelopers component
@@ -559,9 +605,14 @@ const Home = () => {
             {allExclusiveProperties.slice(0,3).map((p) => (
               <div key={p.id || p._id} onClick={() => handlePropertyClick(p)} className="luxury-card cursor-pointer overflow-hidden">
                 <img src={p.images && p.images.length ? p.images[0] : p.image} alt={p.title} className="w-full h-56 object-cover" />
-                <div className="p-4">
+                  <div className="p-4 bg-gray-900">
                   <h3 className="text-white font-bold text-lg">{p.title}</h3>
-                  <p className="text-gray-300 mt-2">{p.location}</p>
+                  <div className="text-sm text-gray-300 mt-2">{p.developer ? `Developer: ${p.developer}` : p.location}</div>
+                  <div className="mt-3 text-sm text-gray-400">Bedrooms: {p.bedrooms || 'N/A'} • Area: {p.area ? `${p.area} sqft` : 'N/A'}</div>
+                  <div className="mt-2 text-sm text-gray-400">Status: {p.status || 'N/A'}</div>
+                  <div className="mt-4">
+                    <Link to={`/property/${p._id || p.id}`} className="inline-block px-4 py-2 bg-yellow-500 text-gray-900 rounded-md font-medium">View Details</Link>
+                  </div>
                 </div>
               </div>
             ))}
@@ -579,15 +630,32 @@ const Home = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {allOffPlanProperties.slice(0,3).map((p) => (
-              <div key={p.id || p._id} onClick={() => handlePropertyClick(p)} className="luxury-card cursor-pointer overflow-hidden">
-                <img src={p.images && p.images.length ? p.images[0] : p.image} alt={p.title} className="w-full h-56 object-cover" />
-                <div className="p-4">
-                  <h3 className="text-white font-bold text-lg">{p.title}</h3>
-                  <p className="text-gray-300 mt-2">Developer: {p.developer || 'N/A'}</p>
+            {publishedProjects.length > 0 ? (
+              publishedProjects.map((p) => (
+                <div key={p.id || p._id} className="luxury-card cursor-pointer overflow-hidden" onClick={() => handlePropertyClick(p)}>
+                  <img src={p.image || (p.images && p.images.length ? p.images[0] : null) || 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'} alt={p.title} className="w-full h-56 object-cover" />
+                  <div className="p-4 bg-gray-900">
+                    <h3 className="text-white font-bold text-lg">{p.title}</h3>
+                    <p className="text-gray-300 mt-2">Developer: {p.developer || 'N/A'}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              allOffPlanProperties.slice(0,3).map((p) => (
+                <div key={p.id || p._id} onClick={() => handlePropertyClick(p)} className="luxury-card cursor-pointer overflow-hidden">
+                  <img src={p.images && p.images.length ? p.images[0] : p.image} alt={p.title} className="w-full h-56 object-cover" />
+                  <div className="p-4 bg-gray-900">
+                    <h3 className="text-white font-bold text-lg">{p.title}</h3>
+                    <div className="text-sm text-gray-300 mt-2">Developer: {p.developer || 'N/A'}</div>
+                    <div className="mt-3 text-sm text-gray-400">Bedrooms: {p.bedrooms || 'N/A'} • Area: {p.area ? `${p.area} sqft` : 'N/A'}</div>
+                    <div className="mt-2 text-sm text-gray-400">Status: {p.status || 'N/A'}</div>
+                    <div className="mt-4">
+                      <Link to={`/property/${p._id || p.id}`} className="inline-block px-4 py-2 bg-yellow-500 text-gray-900 rounded-md font-medium">View Details</Link>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </section>
@@ -678,8 +746,8 @@ const Home = () => {
             
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 px-2 sm:px-4">
             {blogPosts.map((post) => (
-              <Link key={post._id || post.id} to={`/blog/${post._id || post.id}`} className="block h-full">
-                <article className="luxury-card overflow-hidden group cursor-pointer h-full flex flex-col">
+              <div key={post._id || post.id} className="block h-full">
+                <article onClick={() => setActiveBlog(post)} className="luxury-card overflow-hidden group cursor-pointer h-full flex flex-col">
                   <div className="relative overflow-hidden">
                     <img src={post.image || 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=400&h=250&fit=crop'} alt={post.title} className="w-full h-48 object-cover" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
@@ -690,9 +758,60 @@ const Home = () => {
                     <div className="mt-4 text-sm text-gray-400">{post.publishedAt ? new Date(post.publishedAt).toLocaleDateString() : ''}</div>
                   </div>
                 </article>
-              </Link>
+              </div>
             ))}
             </div>
+
+            {/* Blog Modal */}
+            {activeBlog && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+                <div className="absolute inset-0 bg-black/70" onClick={() => setActiveBlog(null)} />
+                <div role="dialog" aria-modal="true" className="relative max-w-3xl w-full mx-auto">
+                  <div className="bg-gray-900 rounded-2xl overflow-hidden border border-gold-500/20 shadow-2xl">
+                    <div className="relative h-56 sm:h-72 md:h-80 lg:h-96">
+                      <img src={activeBlog.image || 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&h=400&fit=crop'} alt={activeBlog.title} className="w-full h-full object-cover" />
+                      <button onClick={() => setActiveBlog(null)} className="absolute top-3 right-3 bg-black/50 text-white rounded-full p-2">✕</button>
+                    </div>
+                    <div className="p-6 max-h-[60vh] overflow-y-auto bg-gray-900">
+                      <h3 className="text-2xl font-bold text-white mb-3">{activeBlog.title}</h3>
+                      <div className="text-sm text-gray-400 mb-4">{activeBlog.publishedAt ? new Date(activeBlog.publishedAt).toLocaleDateString() : ''}</div>
+                      <div className="text-gray-200 leading-relaxed">
+                        {/* Use content if available, otherwise show excerpt */}
+                        {activeBlog.content ? (
+                          <div dangerouslySetInnerHTML={{ __html: activeBlog.content }} />
+                        ) : (
+                          <p>{activeBlog.excerpt}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Project Quick View Modal */}
+            {activeProject && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+                <div className="absolute inset-0 bg-black/70" onClick={() => setActiveProject(null)} />
+                <div role="dialog" aria-modal="true" className="relative max-w-4xl w-full mx-auto">
+                  <div className="bg-gray-900 rounded-2xl overflow-hidden border border-gold-500/20 shadow-2xl">
+                    <div className="relative h-56 sm:h-72 md:h-80 lg:h-96">
+                      <img src={activeProject.image || (activeProject.images && activeProject.images[0]) || 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'} alt={activeProject.title || activeProject.name} className="w-full h-full object-cover" />
+                      <button onClick={() => setActiveProject(null)} className="absolute top-3 right-3 bg-black/50 text-white rounded-full p-2">✕</button>
+                    </div>
+                    <div className="p-6 max-h-[70vh] overflow-y-auto bg-gray-900">
+                      <h3 className="text-2xl font-bold text-white mb-3">{activeProject.title || activeProject.name}</h3>
+                      <div className="text-sm text-gray-400 mb-4">Developer: {activeProject.developer || 'N/A'}</div>
+                      <div className="text-gray-200 leading-relaxed">
+                        <p>{activeProject.description || activeProject.summary || ''}</p>
+                        <div className="mt-4 text-sm text-gray-400">Bedrooms: {activeProject.bedrooms || 'N/A'} • Area: {activeProject.area || 'N/A'}</div>
+                        <div className="mt-2 text-sm text-gray-400">Status: {activeProject.status || activeProject.project_statuses || 'N/A'}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* manual admin CTA removed */}
             

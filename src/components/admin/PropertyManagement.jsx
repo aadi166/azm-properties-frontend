@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { toast } from 'react-hot-toast'
-import { apiService } from '../../services/api'
+import apiService from '../../services/api'
 
 const PropertyManagement = () => {
   const [properties, setProperties] = useState([])
@@ -104,15 +104,19 @@ const PropertyManagement = () => {
       if (response && response.success) {
         toast.success('Property deleted successfully')
         fetchProperties()
+        // notify other parts of the app to refresh properties
+        try { window.dispatchEvent(new Event('propertiesUpdated')) } catch(e){}
       } else {
         // fallback local delete
         setProperties(prev => prev.filter(p => p._id !== propertyId && p.id !== propertyId))
         toast.success('Property deleted (local)')
+        try { window.dispatchEvent(new Event('propertiesUpdated')) } catch(e){}
       }
     } catch (error) {
       console.error('Error deleting property:', error)
       setProperties(prev => prev.filter(p => p._id !== propertyId && p.id !== propertyId))
       toast.success('Property deleted (local)')
+      try { window.dispatchEvent(new Event('propertiesUpdated')) } catch(e){}
     }
   }
 
@@ -177,6 +181,8 @@ const PropertyManagement = () => {
         setShowForm(false)
         setEditingProperty(null)
         fetchProperties()
+        // notify other parts of the app to refresh properties
+        try { window.dispatchEvent(new Event('propertiesUpdated')) } catch(e){}
       } else {
         const msg = (response && response.message) || 'Failed to save property'
         toast.error(msg)

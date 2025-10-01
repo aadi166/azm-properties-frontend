@@ -8,6 +8,7 @@ const ProjectManagement = () => {
   const [showForm, setShowForm] = useState(false)
   const [editingProject, setEditingProject] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [publishingId, setPublishingId] = useState(null)
   const [formData, setFormData] = useState({
     name: '',
     location: '',
@@ -191,6 +192,46 @@ const ProjectManagement = () => {
     } catch (error) {
       console.error('Error deleting project:', error)
       toast.error('Error deleting project')
+    }
+  }
+
+  const togglePublish = async (project) => {
+    const id = project._id || project.id
+    const newPublished = project.published === true ? false : true
+    setPublishingId(id)
+    try {
+      // Primary: try to update via createProject endpoint (server may treat create with id as update)
+      const payload = { id, published: newPublished }
+      let res = null
+      try {
+        res = await apiService.createProject(payload)
+      } catch (err) {
+        // If createProject fails (network/auth), try updateProject fallback
+        try {
+          res = await apiService.updateProject(id, { published: newPublished })
+        } catch (err2) {
+          // both failed
+          console.warn('Both createProject and updateProject failed for publish toggle', err, err2)
+          throw err2 || err
+        }
+      }
+
+      // Normalize response success handling
+      if (res && (res.success === true || res.success)) {
+        toast.success(newPublished ? 'Project published' : 'Project unpublished')
+        setProjects(prev => prev.map(p => (p._id === id || p.id === id) ? { ...p, published: newPublished } : p))
+        // Notify other parts of app to refresh (e.g., Home featured projects)
+        try { window.dispatchEvent(new Event('projectsUpdated')) } catch(e){}
+      } else {
+        // If response shape is different, try to detect message
+        const msg = (res && (res.message || res.response_message)) || 'Failed to update publish status'
+        toast.error(msg)
+      }
+    } catch (error) {
+      console.error('Error toggling publish:', error)
+      toast.error(error && error.message ? error.message : 'Error updating publish status')
+    } finally {
+      setPublishingId(null)
     }
   }
 
@@ -523,6 +564,18 @@ const ProjectManagement = () => {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                               </svg>
                             </button>
+                              <button disabled={publishingId === (project._id || project.id)} onClick={() => togglePublish(project)} className={`p-2 ${project.published ? 'text-green-400 hover:bg-green-400/10' : 'text-yellow-400 hover:bg-yellow-400/10'} rounded-lg transition-colors ${publishingId === (project._id || project.id) ? 'opacity-60 cursor-wait' : ''}`} title={project.published ? 'Unpublish Project' : 'Publish Project'} aria-busy={publishingId === (project._id || project.id)}>
+                                {project.published ? (
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                ) : (
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15a3 3 0 100-6 3 3 0 000 6z" />
+                                  </svg>
+                                )}
+                              </button>
                             <button onClick={() => handleDelete(project._id || project.id)} className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors" title="Delete Project">
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
