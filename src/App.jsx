@@ -6,16 +6,13 @@ import Footer from './components/Footer'
 import ScrollToTop from './components/ScrollToTop'
 import Home from './pages/Home'
 import Properties from './pages/Properties'
-import PropertyDetail from './pages/PropertyDetail'
 import Projects from './pages/Projects'
 import Wishlist from './pages/Wishlist'
 import About from './pages/About'
 import Contact from './pages/Contact'
 import BlogDetail from './pages/BlogDetail'
-import PartnerDetail from './pages/PartnerDetail'
 import PrivacyPolicy from './pages/PrivacyPolicy'
 import TermsAndConditions from './pages/TermsAndConditions'
-import Sitemap from './pages/Sitemap'
 import AdminLogin from './pages/admin/Login'
 import AdminDashboard from './pages/admin/Dashboard'
 import './App.css'
@@ -45,16 +42,13 @@ function App() {
                 <Routes>
                   <Route path="/" element={<Home />} />
                   <Route path="/properties" element={<Properties />} />
-                  <Route path="/property/:id" element={<PropertyDetail />} />
                   <Route path="/projects" element={<Projects />} />
                   <Route path="/wishlist" element={<Wishlist />} />
                   <Route path="/about" element={<About />} />
                   <Route path="/contact" element={<Contact />} />
                   <Route path="/blog/:id" element={<BlogDetail />} />
-                  <Route path="/partner/:id" element={<PartnerDetail />} />
                   <Route path="/privacy" element={<PrivacyPolicy />} />
                   <Route path="/terms" element={<TermsAndConditions />} />
-                  <Route path="/sitemap" element={<Sitemap />} />
                 </Routes>
               </main>
               <Footer />

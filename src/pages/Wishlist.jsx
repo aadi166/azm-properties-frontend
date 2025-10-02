@@ -69,18 +69,19 @@ const Wishlist = () => {
   }
 
   const handleShare = (property) => {
-    const propertyId = property.propertyId || property._id
     const propertyTitle = property.propertyTitle || property.propertyId?.title || 'Property'
+    const shareUrl = window.location.origin + '/properties'
+    const shareText = `Check out amazing properties at AMZ Properties: ${propertyTitle} and more!`
+
     if (navigator.share) {
       navigator.share({
-        title: propertyTitle,
-        text: `Check out this amazing property: ${propertyTitle}`,
-        url: window.location.origin + `/property/${propertyId}`
+        title: 'AMZ Properties - Luxury Real Estate',
+        text: shareText,
+        url: shareUrl
       })
     } else {
-      const shareText = `Check out this amazing property: ${propertyTitle} - ${window.location.origin}/property/${propertyId}`
-      navigator.clipboard.writeText(shareText).then(() => {
-        toast.success('Property link copied to clipboard!')
+      navigator.clipboard.writeText(`${shareText} ${shareUrl}`).then(() => {
+        toast.success('Properties link copied to clipboard!')
       })
     }
   }

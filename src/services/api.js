@@ -1,5 +1,4 @@
 // Static API service - returns static data instead of making HTTP requests
-import { blogs, partners, testimonials, contacts } from '../data/index.js';
 
 // Global API configuration
 const API_CONFIG = {
@@ -58,7 +57,7 @@ const initializeLocalStorage = () => {
     console.log('✅ Projects already exist in localStorage');
   }
   if (!localStorage.getItem(STORAGE_KEYS.BLOGS)) {
-    localStorage.setItem(STORAGE_KEYS.BLOGS, JSON.stringify(blogs));
+    console.log('ℹ️ Skipping seeding blogs to localStorage to prefer API-backed data');
   }
   // Do not seed partners (developers) into localStorage - prefer API-backed developers
   if (!localStorage.getItem(STORAGE_KEYS.PARTNERS)) {
@@ -68,7 +67,7 @@ const initializeLocalStorage = () => {
     console.log('ℹ️ Skipping seeding testimonials to localStorage to prefer API-backed data');
   }
   if (!localStorage.getItem(STORAGE_KEYS.CONTACTS)) {
-    localStorage.setItem(STORAGE_KEYS.CONTACTS, JSON.stringify(contacts));
+    console.log('ℹ️ Skipping seeding contacts to localStorage to prefer API-backed data');
   }
   if (!localStorage.getItem(STORAGE_KEYS.WISHLIST)) {
     localStorage.setItem(STORAGE_KEYS.WISHLIST, JSON.stringify([]));

@@ -3,7 +3,6 @@ import { useNavigate, Link } from 'react-router-dom'
 import apiService from '../services/api.js'
 import TrustedDevelopers from '../components/TrustedDevelopers'
 import { countryCodes } from '../data/countryCodes'
-import { default as staticTestimonials } from '../data/testimonials'
 // Using Unicode symbols instead of react-icons for now
 
 const Home = () => {
@@ -210,13 +209,13 @@ const Home = () => {
         const publishedTestimonials = result.testimonials.filter(testimonial => testimonial.published !== false)
         setTestimonials(publishedTestimonials)
       } else {
-        // Fallback to static testimonials
-        setTestimonials(staticTestimonials)
+        // No fallback available
+        setTestimonials([])
       }
     } catch (error) {
       console.error('Error fetching testimonials:', error)
-      // Fallback to static testimonials
-      setTestimonials(staticTestimonials)
+      // No fallback available
+      setTestimonials([])
     }
   }
 
@@ -610,9 +609,6 @@ const Home = () => {
                   <div className="text-sm text-gray-300 mt-2">{p.developer ? `Developer: ${p.developer}` : p.location}</div>
                   <div className="mt-3 text-sm text-gray-400">Bedrooms: {p.bedrooms || 'N/A'} • Area: {p.area ? `${p.area} sqft` : 'N/A'}</div>
                   <div className="mt-2 text-sm text-gray-400">Status: {p.status || 'N/A'}</div>
-                  <div className="mt-4">
-                    <Link to={`/property/${p._id || p.id}`} className="inline-block px-4 py-2 bg-yellow-500 text-gray-900 rounded-md font-medium">View Details</Link>
-                  </div>
                 </div>
               </div>
             ))}
@@ -649,9 +645,6 @@ const Home = () => {
                     <div className="text-sm text-gray-300 mt-2">Developer: {p.developer || 'N/A'}</div>
                     <div className="mt-3 text-sm text-gray-400">Bedrooms: {p.bedrooms || 'N/A'} • Area: {p.area ? `${p.area} sqft` : 'N/A'}</div>
                     <div className="mt-2 text-sm text-gray-400">Status: {p.status || 'N/A'}</div>
-                    <div className="mt-4">
-                      <Link to={`/property/${p._id || p.id}`} className="inline-block px-4 py-2 bg-yellow-500 text-gray-900 rounded-md font-medium">View Details</Link>
-                    </div>
                   </div>
                 </div>
               ))
