@@ -7,13 +7,16 @@ const API_CONFIG = {
     LOGIN: '/api/users/login/web',
     BLOG_CREATE: '/api/blog/create',
     BLOG_READ: '/api/blog/read',
+    BLOG_UPDATE: '/api/blog/update',
     PROPERTY_READ: '/api/property/read',
     PROPERTY_CREATE: '/api/property/create',
     PROPERTY_DELETE: '/api/property/delete',
     TESTIMONIAL_CREATE: '/api/testimonial/create',
     TESTIMONIAL_READ: '/api/testimonial/read',
+    TESTIMONIAL_UPDATE: '/api/testimonial/update',
     TESTIMONIAL_DELETE: '/api/testimonial/delete',
     DEVELOPER_CREATE: '/api/developer/create',
+    DEVELOPER_READ: '/api/developer/read',
     DEVELOPER_DELETE: '/api/developer/delete',
     PROJECT_READ: '/api/project/read',
     PROJECT_CREATE: '/api/project/create',
@@ -721,13 +724,134 @@ class StaticApiService {
   }
 
   async updateBlog(id, blogData) {
+    // Try to call the backend update endpoint when an admin token exists.
+    // Support both JSON and FormData payloads. If no token, fallback to localStorage.
+    const token = localStorage.getItem(STORAGE_KEYS.ADMIN_TOKEN) || localStorage.getItem('accessToken');
+
+    // Build a list of candidate endpoints to try for update compatibility.
+    const baseCreate = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.BLOG_CREATE}`;
+    const candidates = [
+      `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.BLOG_UPDATE}`,
+      baseCreate.replace('/create', '/update'),
+      baseCreate.replace('/create', '/edit'),
+      baseCreate.replace('/create', '/status'),
+      baseCreate.replace('/create', '/publish'),
+      baseCreate // original create endpoint as a last resort (handled below too)
+    ];
+
+    // Helper to transform API response_data into internal blog shape
+    const transform = (data) => ({
+      _id: data.id || data._id || data.blog_id || id,
+      id: data.blog_id || data.id || data._id || id,
+      title: data.title,
+      content: data.content,
+      category: data.category,
+      tags: data.tags || [],
+      image: data.image,
+      image_url: data.image_url,
+      published: data.published !== false,
+      createdAt: data.created_on ? new Date(data.created_on).toISOString() : new Date().toISOString(),
+      updatedAt: data.updated_on ? new Date(data.updated_on).toISOString() : new Date().toISOString()
+    });
+
+    if (token) {
+      try {
+        let lastError = null;
+
+        // For each candidate endpoint, try PATCH then POST fallback
+        for (const ep of candidates) {
+          try {
+            // Determine body and headers for this attempt
+            let fetchOpts = {
+              method: 'PATCH',
+              headers: {
+                'x-session-key': token,
+                'Accept': 'application/json'
+              }
+            };
+
+            if (blogData instanceof FormData) {
+              // Make a fresh FormData for each attempt to avoid reusing the same instance
+              const fd = new FormData();
+              for (const [k, v] of blogData.entries()) fd.append(k, v);
+              // include id for compatibility
+              fd.append('id', id);
+              fetchOpts.body = fd;
+            } else {
+              fetchOpts.headers['Content-Type'] = 'application/json';
+              fetchOpts.body = JSON.stringify({ id, ...blogData });
+            }
+
+            let response = await fetch(ep, fetchOpts);
+
+            if (response.status === 405 || response.status === 404) {
+              // Try POST fallback to the same endpoint
+              const postOpts = { ...fetchOpts, method: 'POST' };
+              response = await fetch(ep, postOpts);
+            }
+
+            const data = await response.json().catch(() => null);
+            if (response.ok && data && (data.response_code === 200 || data.success === true)) {
+              const updated = data.response_data ? transform(data.response_data) : transform(blogData);
+              return this.createResponse(updated, true, data.response_message || 'Blog updated');
+            }
+
+            // not successful, remember last error and continue to next candidate
+            lastError = data && (data.response_message || data.message) ? new Error(data.response_message || data.message) : new Error(`HTTP ${response.status}`);
+          } catch (epErr) {
+            lastError = epErr;
+            console.warn('Attempt to update via', ep, 'failed:', epErr && epErr.message ? epErr.message : epErr);
+            // try next candidate
+          }
+        }
+
+        // If we reach here, all candidate endpoints failed. Try original create endpoint as a last resort (already included in candidates but ensure)
+        try {
+          const createEndpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.BLOG_CREATE}`;
+          let createOpts = {
+            method: 'POST',
+            headers: {
+              'x-session-key': token,
+              'Accept': 'application/json'
+            }
+          };
+
+          if (blogData instanceof FormData) {
+            const fd2 = new FormData();
+            for (const [k, v] of blogData.entries()) fd2.append(k, v);
+            fd2.append('id', id);
+            createOpts.body = fd2;
+          } else {
+            createOpts.headers['Content-Type'] = 'application/json';
+            createOpts.body = JSON.stringify({ id, ...blogData });
+          }
+
+          const createResp = await fetch(createEndpoint, createOpts);
+          const createData = await createResp.json().catch(() => null);
+          if (createResp.ok && createData && (createData.response_code === 200 || createData.success === true)) {
+            const updated = createData.response_data ? transform(createData.response_data) : transform(blogData);
+            return this.createResponse(updated, true, createData.response_message || 'Blog updated via create endpoint');
+          }
+          lastError = createData && (createData.response_message || createData.message) ? new Error(createData.response_message || createData.message) : new Error(`HTTP ${createResp.status}`);
+        } catch (createFallbackErr) {
+          lastError = createFallbackErr;
+          console.warn('Create-endpoint fallback failed for update:', createFallbackErr);
+        }
+
+        // If all attempts failed, surface the last error
+        throw lastError || new Error('Failed to update blog');
+      } catch (error) {
+        console.error('Error updating blog via API:', error);
+        // Do not fallback to localStorage when admin token exists
+        throw error;
+      }
+    }
+
+    // No token -> fallback to localStorage update
     await simulateDelay();
     const blogsData = getFromStorage(STORAGE_KEYS.BLOGS);
-    console.log('Updating blog:', { id, blogData, totalBlogs: blogsData.length });
-    
     const index = blogsData.findIndex(b => b._id === id || b.id === id);
-    console.log('Found blog at index:', index);
-    
+
     if (index !== -1) {
       // Process tags if they're provided as a string
       let processedData = { ...blogData };
@@ -738,19 +862,15 @@ class StaticApiService {
           processedData.tags = blogData.tags;
         }
       }
-      
-      const updatedBlog = {
+
+      blogsData[index] = {
         ...blogsData[index],
         ...processedData,
         updatedAt: new Date().toISOString()
       };
-      
-      blogsData[index] = updatedBlog;
-      console.log('Updated blog:', updatedBlog);
       saveToStorage(STORAGE_KEYS.BLOGS, blogsData);
-      return this.createResponse(updatedBlog, true, 'Blog updated successfully');
+      return this.createResponse(blogsData[index], true, 'Blog updated successfully (local)');
     } else {
-      console.error('Blog not found with id:', id, 'Available blogs:', blogsData.map(b => ({ id: b.id, _id: b._id, title: b.title })));
       throw new Error('Blog not found');
     }
   }
@@ -813,82 +933,6 @@ class StaticApiService {
       return this.createResponse(null, true, 'Blog deleted successfully (local)');
     } else {
       throw new Error('Blog not found');
-    }
-  }
-
-  // Partners API methods (Legacy)
-  async getPartners(filters = {}) {
-    await simulateDelay();
-    let partnersData = getFromStorage(STORAGE_KEYS.PARTNERS);
-    
-    // Apply filters
-    if (filters.status && filters.status !== 'all') {
-      partnersData = partnersData.filter(p => p.status === filters.status);
-    }
-    if (filters.limit) {
-      partnersData = partnersData.slice(0, parseInt(filters.limit));
-    }
-    
-    return { partners: partnersData, success: true };
-  }
-
-  async getPartnerById(id) {
-    await simulateDelay();
-    const partnersData = getFromStorage(STORAGE_KEYS.PARTNERS);
-    const partner = partnersData.find(p => p._id === id || p.id === id);
-    
-    if (partner) {
-      return this.createResponse(partner);
-    } else {
-      throw new Error('Partner not found');
-    }
-  }
-
-  async createPartner(partnerData) {
-    await simulateDelay();
-    const partnersData = getFromStorage(STORAGE_KEYS.PARTNERS);
-    const newPartner = {
-      ...partnerData,
-      _id: generateId(),
-      id: generateId(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    
-    partnersData.push(newPartner);
-    saveToStorage(STORAGE_KEYS.PARTNERS, partnersData);
-    
-    return this.createResponse(newPartner, true, 'Partner created successfully');
-  }
-
-  async updatePartner(id, partnerData) {
-    await simulateDelay();
-    const partnersData = getFromStorage(STORAGE_KEYS.PARTNERS);
-    const index = partnersData.findIndex(p => p._id === id || p.id === id);
-    
-    if (index !== -1) {
-      partnersData[index] = {
-        ...partnersData[index],
-        ...partnerData,
-        updatedAt: new Date().toISOString()
-      };
-      saveToStorage(STORAGE_KEYS.PARTNERS, partnersData);
-      return this.createResponse(partnersData[index], true, 'Partner updated successfully');
-    } else {
-      throw new Error('Partner not found');
-    }
-  }
-
-  async deletePartner(id) {
-    await simulateDelay();
-    const partnersData = getFromStorage(STORAGE_KEYS.PARTNERS);
-    const filteredPartners = partnersData.filter(p => p._id !== id && p.id !== id);
-    
-    if (filteredPartners.length < partnersData.length) {
-      saveToStorage(STORAGE_KEYS.PARTNERS, filteredPartners);
-      return this.createResponse(null, true, 'Partner deleted successfully');
-    } else {
-      throw new Error('Partner not found');
     }
   }
 
@@ -1358,6 +1402,7 @@ class StaticApiService {
     // Build a list of candidate endpoints to try for update compatibility.
     const baseCreate = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.TESTIMONIAL_CREATE}`;
     const candidates = [
+      `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.TESTIMONIAL_UPDATE}`,
       baseCreate.replace('/create', '/update'),
       baseCreate.replace('/create', '/edit'),
       baseCreate.replace('/create', '/status'),
@@ -1940,7 +1985,7 @@ class StaticApiService {
 
 const apiService = new StaticApiService();
 export default apiService;
-export { apiService };
+export { apiService, API_CONFIG };
 
 // Export individual methods for backward compatibility
 export const {
@@ -1964,11 +2009,6 @@ export const {
   createBlog,
   updateBlog,
   deleteBlog,
-  getPartners,
-  getPartnerById,
-  createPartner,
-  updatePartner,
-  deletePartner,
   getDevelopers,
   getDeveloperById,
   createDeveloper,

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import apiService from '../services/api.js'
-import TrustedDevelopers from '../components/TrustedDevelopers'
 import { countryCodes } from '../data/countryCodes'
 // Using Unicode symbols instead of react-icons for now
 
@@ -9,15 +8,7 @@ const Home = () => {
   const navigate = useNavigate()
   const [currentBgIndex, setCurrentBgIndex] = useState(0)
   const [activeTestimonial, setActiveTestimonial] = useState(0)
-
-
- 
-  const [exclusiveProperties, setExclusiveProperties] = useState([])
-  const [offPlanProperties, setOffPlanProperties] = useState([])
-  const [allExclusiveProperties, setAllExclusiveProperties] = useState([])
-  const [allOffPlanProperties, setAllOffPlanProperties] = useState([])
   const [currentExclusiveIndex, setCurrentExclusiveIndex] = useState(0)
-  const [currentOffPlanIndex, setCurrentOffPlanIndex] = useState(0)
   const [partnerDevelopers, setPartnerDevelopers] = useState([])
   const [testimonials, setTestimonials] = useState([])
   const [blogPosts, setBlogPosts] = useState([])
@@ -26,6 +17,10 @@ const Home = () => {
   const [activeBlog, setActiveBlog] = useState(null) // blog to show in modal
   const [publishedProjects, setPublishedProjects] = useState([])
   const [activeProject, setActiveProject] = useState(null)
+  const [selectedDev, setSelectedDev] = useState(null) // developer to show in modal
+  // Highlighted (featured) properties state
+  const [highlightedProperties, setHighlightedProperties] = useState([])
+  const [activeProperty, setActiveProperty] = useState(null)
   // keep minimal state for home
   
 
@@ -51,16 +46,7 @@ const Home = () => {
   ]
 
   // Partner Developers Data
-  const staticPartnerDevelopers = [
-    { id: 1, name: 'Emaar Properties', logo: 'https://picsum.photos/200/100?random=1', projects: 25 },
-    { id: 2, name: 'Dubai Properties', logo: 'https://picsum.photos/200/100?random=2', projects: 18 },
-    { id: 3, name: 'Damac Properties', logo: 'https://picsum.photos/200/100?random=3', projects: 22 },
-    { id: 4, name: 'Sobha Realty', logo: 'https://picsum.photos/200/100?random=4', projects: 15 },
-    { id: 5, name: 'Meraas', logo: 'https://picsum.photos/200/100?random=5', projects: 12 },
-    { id: 6, name: 'Nakheel', logo: 'https://picsum.photos/200/100?random=6', projects: 20 }
-  ]
-
-  // no services on home - keep page minimal
+  // Removed static data - now relies entirely on API
 
   // Auto-change background images
   useEffect(() => {
@@ -75,79 +61,23 @@ const Home = () => {
 
 
 
-  // Fetch partners from API
-  const fetchPartners = async () => {
+  // Fetch developers from API
+  const fetchDevelopers = async () => {
     try {
-      // Fetch both partners and projects data
-      const [partnersResult, projectsResult] = await Promise.all([
-        apiService.getPartners({ limit: 1000 }),
-        apiService.getProjects({ limit: 1000 })
-      ])
-      
-      const partnersData = partnersResult.partners || []
-      const projectsData = projectsResult.data || []
-      
-      if (Array.isArray(partnersData) && partnersData.length > 0) {
-        // Calculate actual project counts for each developer
-        const transformedPartners = partnersData
-          .filter(partner => partner.status === 'active')
-          .map(partner => {
-            // Count actual projects for this developer
-            const actualProjectCount = projectsData.filter(project => 
-              project.developer && 
-              project.developer.toLowerCase().includes(partner.name.toLowerCase())
-            ).length
-            
-            return {
-              id: partner._id,
-              name: partner.name,
-              logo: partner.logo ? 
-                (partner.logo.startsWith('http') ? partner.logo : `http://localhost:5003${partner.logo}`) : 
-                'https://via.placeholder.com/200x100/d97706/000000?text=' + partner.name.replace(/\s+/g, '+'),
-              projects: actualProjectCount,
-              description: partner.description
-            }
-          })
-        setPartnerDevelopers(transformedPartners)
-      } else {
-        // Fallback to static data but calculate actual project counts
-        const projectsData = projectsResult.data || []
-        const updatedStaticPartners = staticPartnerDevelopers.map(partner => {
-          const actualProjectCount = projectsData.filter(project => 
-            project.developer && 
-            project.developer.toLowerCase().includes(partner.name.toLowerCase())
-          ).length
-          
-          return {
-            ...partner,
-            projects: actualProjectCount
-          }
-        })
-        setPartnerDevelopers(updatedStaticPartners)
+      if (typeof apiService.getDevelopers === 'function') {
+        const res = await apiService.getDevelopers()
+        let developersList = []
+        if (res?.success && Array.isArray(res.data)) developersList = res.data
+        else if (Array.isArray(res)) developersList = res
+        else if (res?.data && Array.isArray(res.data)) developersList = res.data
+
+        // Filter only active developers
+        const activeDevelopers = developersList.filter(developer => developer.status !== 'inactive')
+        setPartnerDevelopers(activeDevelopers)
       }
     } catch (error) {
-      console.error('Error fetching partners:', error)
-      // Fallback to static data with calculated project counts
-      try {
-        const projectsResult = await apiService.getProjects({ limit: 1000 })
-        const projectsData = projectsResult.data || []
-        const updatedStaticPartners = staticPartnerDevelopers.map(partner => {
-          const actualProjectCount = projectsData.filter(project => 
-            project.developer && 
-            project.developer.toLowerCase().includes(partner.name.toLowerCase())
-          ).length
-          
-          return {
-            ...partner,
-            projects: actualProjectCount
-          }
-        })
-        setPartnerDevelopers(updatedStaticPartners)
-      } catch (projectError) {
-        console.error('Error fetching projects for fallback:', projectError)
-        // Final fallback to original static data
-        setPartnerDevelopers(staticPartnerDevelopers)
-      }
+      console.error('Error fetching developers:', error)
+      setPartnerDevelopers([])
     }
   }
 
@@ -175,6 +105,39 @@ const Home = () => {
     } catch (error) {
       console.error('Error fetching projects for highlighted section', error)
       setPublishedProjects([])
+    }
+  }
+
+  // Fetch highlighted properties (similar pattern to highlighted projects)
+  const fetchHighlightedProperties = async () => {
+    try {
+      if (typeof apiService.getProperties !== 'function') return
+      const res = await apiService.getProperties({ limit: 1000 })
+      let items = []
+      // Flexible extraction like projects
+      if (Array.isArray(res)) items = res
+      else if (res && Array.isArray(res.data)) items = res.data
+      else if (res && res.data && Array.isArray(res.data.items)) items = res.data.items
+      else {
+        const possibleArray = res && typeof res === 'object' ? Object.values(res).find(v => Array.isArray(v)) : null
+        if (possibleArray) items = possibleArray
+      }
+
+      // We consider properties as highlight-worthy if status available (or no status) and maybe type exclusive/off-plan
+      const candidates = (items || []).filter(p => p && p.status !== 'inactive')
+
+      // Normalize structure similar to PropertyManagement display
+      const normalized = candidates.map(p => ({
+        ...p,
+        title: p.title || p.name || '',
+        image: p.image || (p.images && p.images.length ? p.images[0] : null)
+      }))
+
+      // Choose first 3 (could later add isHighlighted flag filtering if backend provides)
+      setHighlightedProperties(normalized.slice(0, 3))
+    } catch (error) {
+      console.error('Error fetching highlighted properties', error)
+      setHighlightedProperties([])
     }
   }
 
@@ -253,22 +216,7 @@ const Home = () => {
     }
   }
 
-  // Off-Plan Properties navigation functions
-  const nextOffPlanProperties = () => {
-    if (currentOffPlanIndex + 3 < allOffPlanProperties.length) {
-      const newIndex = currentOffPlanIndex + 3
-      setCurrentOffPlanIndex(newIndex)
-      setOffPlanProperties(allOffPlanProperties.slice(newIndex, newIndex + 3))
-    }
-  }
 
-  const prevOffPlanProperties = () => {
-    if (currentOffPlanIndex > 0) {
-      const newIndex = Math.max(0, currentOffPlanIndex - 3)
-      setCurrentOffPlanIndex(newIndex)
-      setOffPlanProperties(allOffPlanProperties.slice(newIndex, newIndex + 3))
-    }
-  }
 
   // Property click handler
   const handlePropertyClick = (property) => {
@@ -276,12 +224,22 @@ const Home = () => {
     setActiveProject(property)
   }
 
+  // Developer click handler
+  const handleDeveloperClick = (developer) => {
+    // open modal/profile pop-off
+    setSelectedDev(developer)
+  }
+
+  // Close developer modal
+  const closeDeveloperModal = () => setSelectedDev(null)
+
   // Initialize data
   useEffect(() => {
-    fetchPartners()
+    fetchDevelopers()
     fetchBlogs()
     fetchTestimonials()
     fetchPublishedProjects()
+    fetchHighlightedProperties()
   }, [])
 
   // Refresh blogs when window gains focus (user returns from admin panel)
@@ -297,12 +255,18 @@ const Home = () => {
     window.addEventListener('testimonialsUpdated', handleTestimonialsUpdated)
     // Listen for projects updates dispatched from admin (publish/unpublish)
     const handleProjectsUpdated = () => fetchPublishedProjects()
+  const handlePropertiesUpdated = () => fetchHighlightedProperties()
+    const handleDevelopersUpdated = () => fetchDevelopers()
     window.addEventListener('projectsUpdated', handleProjectsUpdated)
+  window.addEventListener('propertiesUpdated', handlePropertiesUpdated)
+    window.addEventListener('developersUpdated', handleDevelopersUpdated)
 
     return () => {
       window.removeEventListener('focus', handleFocus)
       window.removeEventListener('testimonialsUpdated', handleTestimonialsUpdated)
       window.removeEventListener('projectsUpdated', handleProjectsUpdated)
+      window.removeEventListener('propertiesUpdated', handlePropertiesUpdated)
+      window.removeEventListener('developersUpdated', handleDevelopersUpdated)
     }
   }, [])
 
@@ -315,51 +279,6 @@ const Home = () => {
       return () => clearInterval(interval)
     }
   }, [testimonials])
-
-
-  // Fetch properties from static API service
-  useEffect(() => {
-    const fetchProperties = async () => {
-      try {
-      const result = await apiService.getProperties()
-      if (result.success && Array.isArray(result.data)) {
-        // Only show properties that are published (published !== false)
-        const items = result.data.filter(p => p && p.published !== false)
-        const exclusive = items.filter(property => property.category === 'exclusive')
-        const offPlan = items.filter(property => property.category === 'off-plan')
-          setAllExclusiveProperties(exclusive)
-          setAllOffPlanProperties(offPlan)
-          setExclusiveProperties(exclusive.slice(0, 3))
-          setOffPlanProperties(offPlan.slice(0, 3))
-        } else {
-          // Fallback to static data if data is not an array
-          setAllExclusiveProperties(staticExclusiveProperties)
-          setAllOffPlanProperties(staticOffPlanProperties)
-          setExclusiveProperties(staticExclusiveProperties.slice(0, 3))
-          setOffPlanProperties(staticOffPlanProperties.slice(0, 3))
-        }
-      } catch (error) {
-        console.error('Error fetching properties:', error)
-        // Fallback to static data if API fails
-        setAllExclusiveProperties(staticExclusiveProperties)
-        setAllOffPlanProperties(staticOffPlanProperties)
-        setExclusiveProperties(staticExclusiveProperties.slice(0, 3))
-        setOffPlanProperties(staticOffPlanProperties.slice(0, 3))
-      }
-    }
-    
-    fetchProperties()
-    // Listen for property updates dispatched from admin panel
-    const handlePropertiesUpdated = () => fetchProperties()
-    window.addEventListener('propertiesUpdated', handlePropertiesUpdated)
-
-    return () => {
-      window.removeEventListener('propertiesUpdated', handlePropertiesUpdated)
-    }
-  }, [])
-
-  // Developer navigation handled in TrustedDevelopers component
-
 
 
   // Contact form handling functions
@@ -421,117 +340,6 @@ const Home = () => {
 
 
   
-  // Static Exclusive Properties Data (fallback)
-  const staticExclusiveProperties = [
-    {
-      id: 1,
-      title: 'Luxury Villa',
-      price: 'FROM AED 7,500,000',
-      bedrooms: 2,
-      bathrooms: 2,
-      location: 'Jumeirah Village Triangle',
-      badge: 'Exclusive',
-      image: 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
-    },
-    {
-      id: 2,
-      title: 'Premium Penthouse',
-      price: 'FROM AED 35,000,000',
-      bedrooms: 7,
-      bathrooms: 7,
-      location: 'Al Manara',
-      badge: 'Exclusive',
-      image: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
-    },
-    {
-      id: 3,
-      title: 'Modern Apartment',
-      price: 'FROM AED 2,400,000',
-      bedrooms: 2,
-      bathrooms: 2,
-      location: 'Mohammad Bin Rashid City',
-      badge: 'Exclusive',
-      image: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
-    },
-    {
-      id: 4,
-      title: 'Studio Apartment',
-      price: 'FROM AED 1,850,000',
-      bedrooms: 1,
-      bathrooms: 1,
-      location: 'Mohammad Bin Rashid City',
-      badge: 'Exclusive',
-      image: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
-    },
-    {
-      id: 5,
-      title: 'Waterfront Villa',
-      price: 'FROM AED 3,200,000',
-      bedrooms: 4,
-      bathrooms: 4,
-      location: 'Damac Lagoons',
-      badge: 'Exclusive',
-      image: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
-    },
-    {
-      id: 6,
-      title: 'Modern Studio',
-      price: 'FROM AED 1,280,000',
-      bedrooms: 2,
-      bathrooms: 2,
-      location: 'Dubai Studio City',
-      badge: 'Exclusive',
-      image: 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
-    }
-  ]
-
-  // Static Off-Plan Properties Data (fallback)
-  const staticOffPlanProperties = [
-    {
-      id: 7,
-      title: 'Luxury Apartments',
-      price: 'FROM AED 2,100,000',
-      bedrooms: '1 2 3',
-      location: 'Mina Rashid',
-      developer: 'Emaar Properties',
-      badge: 'Off Plan',
-      image: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
-    },
-    {
-      id: 8,
-      title: 'Studio & Apartments',
-      price: 'FROM AED 748,000',
-      bedrooms: 'Studio 1 2',
-      location: 'Majan',
-      developer: 'Meraki Developers',
-      badge: 'Off Plan',
-      image: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
-    },
-    {
-      id: 9,
-      title: 'Premium Villas',
-      price: 'FROM AED 4,100,000',
-      bedrooms: '1 2 3 4',
-      location: 'Palm Jumeirah',
-      developer: 'Beyond Development',
-      badge: 'Off Plan',
-      image: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
-    },
-    {
-      id: 10,
-      title: 'Waterfront Apartments',
-      price: 'FROM AED 1,910,000',
-      bedrooms: '1 2 3',
-      location: 'Dubai Creek Harbour',
-      developer: 'Emaar Properties',
-      badge: 'Off Plan',
-      image: 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
-    }
-  ]
-
-
-
-  
 
   return (
     <div className="min-h-screen bg-black">
@@ -588,34 +396,135 @@ const Home = () => {
         </div>
       </section>
 
+      
   {/* Partner Developers Section */}
-  <TrustedDevelopers />
+  <section className="py-16 sm:py-20 lg:py-24 bg-gradient-to-br from-black via-dark-900 to-black relative overflow-hidden">
+    {/* Background decorative elements */}
+    <div className="absolute inset-0 opacity-10">
+      <div className="absolute top-20 left-10 w-32 h-32 bg-gold-500/20 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-20 right-10 w-40 h-40 bg-luxury-500/20 rounded-full blur-3xl"></div>
+      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-60 h-60 bg-gold-400/10 rounded-full blur-3xl"></div>
+    </div>
 
-      {/* Highlighted Properties Section (Featured Ready Listings) */}
-      <section className="py-12 sm:py-16 lg:py-20 bg-black/95 border-t border-gold-500/20">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-8 sm:mb-12 lg:mb-16">
-            <span className="text-gold-400 font-medium tracking-wider uppercase text-sm mb-4 block">Highlighted</span>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-gold-400 mb-4 sm:mb-6 font-serif px-4 sm:px-0">Featured Properties</h2>
-            <p className="text-lg sm:text-xl text-gray-300 max-w-3xl mx-auto px-4 sm:px-0">Selected ready listings curated from our Properties section</p>
-          </div>
+    <div className="container mx-auto px-4 relative z-10">
+      {/* Section Header */}
+      <div className="text-center mb-8 sm:mb-12 lg:mb-16">
+        <span className="inline-block text-gold-400 font-medium tracking-wider uppercase text-xs sm:text-sm mb-3 sm:mb-4 px-3 sm:px-4 py-1.5 sm:py-2 border border-gold-500/30 rounded-full bg-gold-500/10">
+          Trusted Partners
+        </span>
+        <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-white mb-4 sm:mb-6 font-serif px-4 sm:px-0">
+          Our <span className="text-gold-400">Trusted</span> Partners
+        </h2>
+        <p className="text-base sm:text-lg md:text-xl text-gray-300 max-w-3xl mx-auto leading-relaxed px-4 sm:px-6 lg:px-0">
+          Partnering with Dubai's most prestigious and renowned developers to deliver exceptional properties and unmatched quality
+        </p>
+      </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {allExclusiveProperties.slice(0,3).map((p) => (
-              <div key={p.id || p._id} onClick={() => handlePropertyClick(p)} className="luxury-card cursor-pointer overflow-hidden">
-                <img src={p.images && p.images.length ? p.images[0] : p.image} alt={p.title} className="w-full h-56 object-cover" />
-                  <div className="p-4 bg-gray-900">
-                  <h3 className="text-white font-bold text-lg">{p.title}</h3>
-                  <div className="text-sm text-gray-300 mt-2">{p.developer ? `Developer: ${p.developer}` : p.location}</div>
-                  <div className="mt-3 text-sm text-gray-400">Bedrooms: {p.bedrooms || 'N/A'} • Area: {p.area ? `${p.area} sqft` : 'N/A'}</div>
-                  <div className="mt-2 text-sm text-gray-400">Status: {p.status || 'N/A'}</div>
+      {/* Developers Grid */}
+      <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 sm:gap-6 lg:gap-4">
+        {partnerDevelopers.length === 0 ? (
+          <div className="col-span-full text-center text-gray-400">No developers found</div>
+        ) : (
+          partnerDevelopers.map((developer, index) => (
+            <div
+              key={developer._id || developer.id || index}
+              className="group relative cursor-pointer"
+              style={{ animationDelay: `${index * 0.05}s` }}
+              onClick={() => handleDeveloperClick(developer)}
+            >
+              {/* Developer Card */}
+              <div className="relative bg-gradient-to-br from-white/6 to-white/3 backdrop-blur-sm border border-gold-500/20 rounded-xl sm:rounded-2xl p-4 sm:p-6 lg:p-4 h-full transition-all duration-500 hover:border-gold-400/40 hover:bg-gradient-to-br hover:from-gold-500/10 hover:to-gold-400/5 hover:scale-105 hover:shadow-2xl hover:shadow-gold-500/20 cursor-pointer">
+
+                {/* Logo Container or placeholder */}
+                <div className="relative mb-3 sm:mb-4 lg:mb-3">
+                  <div className="w-full h-14 sm:h-16 md:h-18 lg:h-14 flex items-center justify-center bg-white/95 rounded-lg sm:rounded-xl p-2 sm:p-3 group-hover:bg-white transition-all duration-300">
+                    {developer.logo ? (
+                      <img src={developer.logo} alt={developer.name} className="max-w-full max-h-full object-contain filter group-hover:scale-110 transition-all duration-300" loading="lazy" />
+                    ) : (
+                      <div className="w-10 h-10 bg-gray-200 rounded-md flex items-center justify-center text-gray-700 font-semibold">{(developer.name || 'D').charAt(0)}</div>
+                    )}
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-gold-500/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 rounded-lg sm:rounded-xl"></div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
+                <div className="text-center">
+                  <h3 className="text-white font-bold text-xs sm:text-sm md:text-base lg:text-sm mb-1 sm:mb-2 group-hover:text-gold-400 transition-colors duration-300 leading-tight">{developer.name}</h3>
+                  <p className="text-gray-400 text-xs sm:text-sm lg:text-xs leading-relaxed opacity-0 sm:opacity-0 md:group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0 hidden sm:block">{developer.description}</p>
+
+                  <div className="mt-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
+                    <span className="text-gold-400 text-xs font-medium border border-gold-400/50 px-2 py-1 rounded-full bg-gold-400/10">View Profile</span>
+                  </div>
+                </div>
+
+                <div className="absolute top-2 right-2 w-2 h-2 sm:w-3 sm:h-3 border-t-2 border-r-2 border-gold-400/30 opacity-0 group-hover:opacity-100 transition-all duration-300"></div>
+                <div className="absolute bottom-2 left-2 w-2 h-2 sm:w-3 sm:h-3 border-b-2 border-l-2 border-gold-400/30 opacity-0 group-hover:opacity-100 transition-all duration-300"></div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Bottom CTA */}
+      <div className="text-center mt-12 sm:mt-16 lg:mt-20 px-4 sm:px-0">
+        <p className="text-gray-300 mb-6 sm:mb-8 text-base sm:text-lg max-w-2xl mx-auto">
+          Ready to explore premium properties from these trusted partners?
+        </p>
+        <button className="bg-gradient-to-r from-gold-400 to-gold-600 text-black px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-semibold text-base sm:text-lg hover:from-gold-500 hover:to-gold-700 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl w-full sm:w-auto max-w-xs sm:max-w-none">
+          View All Properties
+        </button>
+      </div>
+    </div>
+
+    {/* Developer Profile Modal */}
+    {selectedDev && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/60" onClick={closeDeveloperModal}></div>
+        <div className="relative bg-gray-900 rounded-2xl border border-yellow-400/20 max-w-3xl w-full mx-4 p-6 z-10">
+          <div className="flex justify-between items-start">
+            <div>
+              <h3 className="text-2xl font-bold text-white">{selectedDev.name}</h3>
+              <p className="text-yellow-300/70 text-sm">{selectedDev.description}</p>
+            </div>
+            <button onClick={closeDeveloperModal} className="text-yellow-300 text-sm px-3 py-1">Close</button>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <h4 className="text-yellow-300 font-medium mb-2">Overview</h4>
+              <p className="text-gray-300 text-sm leading-relaxed">{selectedDev.about || selectedDev.description}</p>
+
+              <div className="mt-3 text-sm text-yellow-100">
+                <div><strong>Established:</strong> {selectedDev.established || selectedDev.established_year || selectedDev.createdAt?.slice(0,4) || 'N/A'}</div>
+                <div className="mt-1"><strong>Total Projects:</strong> {selectedDev.totalProjects || selectedDev.total_projects || selectedDev.totalProjects || 'N/A'}</div>
+                {selectedDev.specialties && <div className="mt-1"><strong>Specialties:</strong> {(selectedDev.specialties || []).join(', ')}</div>}
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-yellow-300 font-medium mb-2">Contact</h4>
+              <div className="text-sm text-yellow-100">
+                {selectedDev.contact?.website && <div><a href={selectedDev.contact.website} target="_blank" rel="noreferrer" className="text-gold-400 underline">Visit Website</a></div>}
+                {selectedDev.contact?.phone && <div className="mt-1">Phone: {selectedDev.contact.phone}</div>}
+                {selectedDev.contact?.email && <div className="mt-1">Email: {selectedDev.contact.email}</div>}
+                {selectedDev.contact?.address && <div className="mt-1">Address: {selectedDev.contact.address.street || selectedDev.contact.address}</div>}
+              </div>
+            </div>
+          </div>
+
+          {selectedDev.projects && selectedDev.projects.length > 0 && (
+            <div className="mt-4">
+              <h4 className="text-yellow-300 font-medium mb-2">Projects</h4>
+              <ul className="list-disc list-inside text-gray-300 text-sm">
+                {selectedDev.projects.map((p, i) => (
+                  <li key={i}>{p.name || p.title || p.projectName || 'Untitled Project'}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </div>
+    )}
+  </section>
       {/* Highlighted Projects Section (Featured Off-Plan) */}
       <section className="py-20 bg-black/95 border-t border-gold-500/20">
         <div className="container mx-auto px-4">
@@ -637,21 +546,68 @@ const Home = () => {
                 </div>
               ))
             ) : (
-              allOffPlanProperties.slice(0,3).map((p) => (
-                <div key={p.id || p._id} onClick={() => handlePropertyClick(p)} className="luxury-card cursor-pointer overflow-hidden">
-                  <img src={p.images && p.images.length ? p.images[0] : p.image} alt={p.title} className="w-full h-56 object-cover" />
-                  <div className="p-4 bg-gray-900">
-                    <h3 className="text-white font-bold text-lg">{p.title}</h3>
-                    <div className="text-sm text-gray-300 mt-2">Developer: {p.developer || 'N/A'}</div>
-                    <div className="mt-3 text-sm text-gray-400">Bedrooms: {p.bedrooms || 'N/A'} • Area: {p.area ? `${p.area} sqft` : 'N/A'}</div>
-                    <div className="mt-2 text-sm text-gray-400">Status: {p.status || 'N/A'}</div>
-                  </div>
-                </div>
-              ))
+              <div className="col-span-full text-center text-gray-400 py-12">
+                <p className="text-lg">No featured projects available at the moment.</p>
+                <p className="text-sm mt-2">Check back soon for new listings.</p>
+              </div>
             )}
           </div>
         </div>
       </section>
+
+      {/* Highlighted Properties Section (Featured Listings) */}
+      <section className="py-20 bg-black border-t border-gold-500/10">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <span className="text-gold-400 font-medium tracking-wider uppercase text-sm mb-4 block">Featured</span>
+            <h2 className="text-4xl font-bold text-gold-400 mb-4 font-serif">Highlighted Properties</h2>
+            <p className="text-gray-300 max-w-2xl mx-auto">A curated selection of standout properties from our collection</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {highlightedProperties.length > 0 ? (
+              highlightedProperties.map((prop) => (
+                <div
+                  key={prop._id || prop.id}
+                  className="luxury-card cursor-pointer overflow-hidden group"
+                  onClick={() => setActiveProperty(prop)}
+                >
+                  <div className="relative h-56 overflow-hidden">
+                    <img
+                      src={prop.image || (prop.images && prop.images[0]) || 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80'}
+                      alt={prop.title}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"></div>
+                    {prop.type && (
+                      <span className={`absolute top-3 left-3 px-3 py-1 rounded-full text-xs font-semibold bg-gold-500/90 text-black`}>{prop.type === 'off-plan' ? 'Off-Plan' : 'Exclusive'}</span>
+                    )}
+                  </div>
+                  <div className="p-4 bg-gray-900">
+                    <h3 className="text-white font-bold text-lg line-clamp-1">{prop.title}</h3>
+                    <div className="mt-2 text-gold-400 font-semibold text-sm">
+                      {prop.price ? new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED', minimumFractionDigits: 0 }).format(prop.price) : 'Price on Request'}
+                    </div>
+                    <p className="text-gray-400 text-sm mt-2 line-clamp-2">{prop.location}</p>
+                    <div className="mt-3 flex flex-wrap gap-3 text-xs text-gray-300">
+                      {prop.bedrooms && <span>{prop.bedrooms} BR</span>}
+                      {prop.bathrooms && <span>{prop.bathrooms} BA</span>}
+                      {prop.area && <span>{Number(prop.area).toLocaleString()} sq ft</span>}
+                      {prop.roi && <span className="text-green-400">ROI {prop.roi}%</span>}
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="col-span-full text-center text-gray-400 py-12">
+                <p className="text-lg">No highlighted properties available right now.</p>
+                <p className="text-sm mt-2">New featured listings will appear here soon.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
 
       {/* Testimonials Section - always shown; show placeholder when empty */}
       <section className="py-20 relative overflow-hidden">
@@ -799,6 +755,54 @@ const Home = () => {
                         <p>{activeProject.description || activeProject.summary || ''}</p>
                         <div className="mt-4 text-sm text-gray-400">Bedrooms: {activeProject.bedrooms || 'N/A'} • Area: {activeProject.area || 'N/A'}</div>
                         <div className="mt-2 text-sm text-gray-400">Status: {activeProject.status || activeProject.project_statuses || 'N/A'}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Property Quick View Modal */}
+            {activeProperty && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+                <div className="absolute inset-0 bg-black/70" onClick={() => setActiveProperty(null)} />
+                <div role="dialog" aria-modal="true" className="relative max-w-4xl w-full mx-auto">
+                  <div className="bg-gray-900 rounded-2xl overflow-hidden border border-gold-500/20 shadow-2xl">
+                    <div className="relative h-56 sm:h-72 md:h-80 lg:h-96">
+                      <img
+                        src={activeProperty.image || (activeProperty.images && activeProperty.images[0]) || 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=80'}
+                        alt={activeProperty.title}
+                        className="w-full h-full object-cover"
+                      />
+                      <button onClick={() => setActiveProperty(null)} className="absolute top-3 right-3 bg-black/50 text-white rounded-full p-2">✕</button>
+                    </div>
+                    <div className="p-6 max-h-[70vh] overflow-y-auto bg-gray-900">
+                      <h3 className="text-2xl font-bold text-white mb-3">{activeProperty.title}</h3>
+                      <div className="text-sm text-gray-400 mb-4">
+                        {activeProperty.location} {activeProperty.type && <span className="ml-2 text-gold-400">• {activeProperty.type === 'off-plan' ? 'Off-Plan' : 'Exclusive'}</span>}
+                      </div>
+                      <div className="text-gold-400 font-semibold text-lg mb-4">
+                        {activeProperty.price ? new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED', minimumFractionDigits: 0 }).format(activeProperty.price) : 'Price on Request'}
+                      </div>
+                      <div className="text-gray-200 leading-relaxed">
+                        <p>{activeProperty.description}</p>
+                        <div className="mt-4 text-sm text-gray-300 flex flex-wrap gap-4">
+                          {activeProperty.bedrooms && <span>{activeProperty.bedrooms} Bedrooms</span>}
+                          {activeProperty.bathrooms && <span>{activeProperty.bathrooms} Bathrooms</span>}
+                          {activeProperty.area && <span>{Number(activeProperty.area).toLocaleString()} sq ft</span>}
+                          {activeProperty.status && <span>Status: {activeProperty.status}</span>}
+                          {activeProperty.roi && <span className="text-green-400">ROI {activeProperty.roi}%</span>}
+                        </div>
+                        {activeProperty.features && activeProperty.features.length > 0 && (
+                          <div className="mt-6">
+                            <h4 className="text-gold-400 font-medium mb-2">Features</h4>
+                            <div className="flex flex-wrap gap-2">
+                              {activeProperty.features.map((f, i) => (
+                                <span key={i} className="px-3 py-1 rounded-full text-xs bg-gold-500/10 border border-gold-500/30 text-gold-300">{f}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { toast } from 'react-hot-toast'
 import apiService from '../../services/api'
+import GenericCard from './GenericCard'
+import GenericModal from './GenericModal'
 
 const DeveloperManagement = () => {
   const [developers, setDevelopers] = useState([])
@@ -23,7 +25,8 @@ const DeveloperManagement = () => {
     website: '',
     email: '',
     mobile_no: '',
-    address: ''
+    address: '',
+    published: true
   })
 
   const [projectFilters, setProjectFilters] = useState({
@@ -68,13 +71,27 @@ const DeveloperManagement = () => {
   const fetchDevelopers = async () => {
     try {
       setLoading(true)
+      console.log('DeveloperManagement: Starting fetchDevelopers')
       if (typeof apiService.getDevelopers === 'function') {
         const res = await apiService.getDevelopers()
-        if (res?.success && Array.isArray(res.data)) setDevelopers(res.data)
-        else if (Array.isArray(res)) setDevelopers(res)
+        console.log('DeveloperManagement: API response', res)
+        if (res?.success && Array.isArray(res.data)) {
+          console.log('DeveloperManagement: Setting developers from res.data', res.data.length)
+          setDevelopers(res.data)
+        } else if (Array.isArray(res)) {
+          console.log('DeveloperManagement: Setting developers from res array', res.length)
+          setDevelopers(res)
+        } else {
+          console.log('DeveloperManagement: No valid data found, setting empty array')
+          setDevelopers([])
+        }
+      } else {
+        console.log('DeveloperManagement: apiService.getDevelopers not available')
+        setDevelopers([])
       }
     } catch (err) {
       console.error('Error fetching developers:', err)
+      setDevelopers([])
     } finally {
       setLoading(false)
     }
@@ -111,6 +128,7 @@ const DeveloperManagement = () => {
       submitData.append('description', formData.description);
       submitData.append('established_year', formData.established_year);
       submitData.append('website', formData.website);
+      submitData.append('published', formData.published);
 
       // Add contact info
       submitData.append('contact_info', JSON.stringify(formData.contact_info));
@@ -173,7 +191,8 @@ const DeveloperManagement = () => {
       website: developer.website || '',
       email: developer.email || '', // backward compatibility
       mobile_no: developer.mobile_no || '', // backward compatibility
-      address: developer.address || '' // backward compatibility
+      address: developer.address || '', // backward compatibility
+      published: developer.published !== false
     })
     // Prefill selected projects from developer record if available
     const existingProjectIds = []
@@ -212,6 +231,23 @@ const DeveloperManagement = () => {
     }
   }
 
+  const handlePublishToggle = async (developerId, currentStatus) => {
+    try {
+      const newPublishedStatus = !currentStatus
+      const response = await apiService.updateDeveloper(developerId, { published: newPublishedStatus })
+
+      if (response && response.success) {
+        toast.success(`Developer ${newPublishedStatus ? 'published' : 'unpublished'} successfully`)
+        fetchDevelopers()
+      } else {
+        toast.error('Failed to update developer status')
+      }
+    } catch (error) {
+      console.error('Error toggling developer publish status:', error)
+      toast.error('Error updating developer status')
+    }
+  }
+
   const resetForm = () => {
     setFormData({
       name: '',
@@ -234,7 +270,8 @@ const DeveloperManagement = () => {
       website: '',
       email: '', // backward compatibility
       mobile_no: '', // backward compatibility
-      address: '' // backward compatibility
+      address: '', // backward compatibility
+      published: true
     })
     setSelectedProjectIds([])
   }
@@ -263,25 +300,10 @@ const DeveloperManagement = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-3xl font-bold bg-gradient-to-r from-yellow-400 to-yellow-200 bg-clip-text text-transparent">Developer Management</h2>
-          <p className="text-yellow-300/80 mt-1">Manage property developers and their information</p>
-        </div>
-        <button
-          onClick={() => setShowForm(true)}
-          className="flex items-center space-x-2 bg-gradient-to-r from-yellow-400 to-yellow-500 text-gray-900 px-6 py-3 rounded-xl hover:from-yellow-300 hover:to-yellow-400 transition-all duration-300 font-medium shadow-lg hover:shadow-xl"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-          </svg>
-          <span>Add New Developer</span>
-        </button>
-      </div>
-
       {/* Inline Add/Edit Form */}
       {showForm && (
-        <div className="bg-gray-800 rounded-2xl border border-yellow-400/30 max-w-4xl w-full mx-auto my-8 admin-modal-panel">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-gray-800 rounded-2xl border border-yellow-400/30 max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden admin-modal-panel">
           <div className="sticky top-0 bg-gray-800 p-6 border-b border-yellow-400/30 rounded-t-2xl">
             <h3 className="text-xl font-bold text-yellow-300">
               {editingDeveloper ? 'Edit Developer' : 'Add New Developer'}
@@ -553,6 +575,25 @@ const DeveloperManagement = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Publishing Options */}
+              <div className="border-b border-yellow-400/30 pb-6">
+                <h4 className="text-md font-medium text-yellow-300 mb-4">Publishing Options</h4>
+
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    id="published"
+                    name="published"
+                    checked={formData.published}
+                    onChange={(e) => setFormData(prev => ({ ...prev, published: e.target.checked }))}
+                    className="w-5 h-5 text-yellow-400 bg-gray-900 border-yellow-400/30 rounded focus:ring-yellow-400 focus:ring-2"
+                  />
+                  <label htmlFor="published" className="text-sm font-medium text-yellow-300 cursor-pointer">
+                    Publish immediately
+                  </label>
+                </div>
+              </div>
             </form>
           </div>
 
@@ -577,90 +618,71 @@ const DeveloperManagement = () => {
             </button>
           </div>
         </div>
+        </div>
       )}
 
       {/* Developers List */}
-      <div className="bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-yellow-400/30">
-        <div className="p-6">
-          <h3 className="text-lg font-semibold text-yellow-300 mb-4">
-            All Developers ({developers.length})
-          </h3>
-          {developers.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="w-24 h-24 mx-auto mb-4 bg-yellow-400/10 rounded-full flex items-center justify-center">
-                <svg className="w-12 h-12 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 rounded-2xl shadow-2xl border border-yellow-400/30 backdrop-blur-sm">
+        <div className="px-8 py-6 border-b border-yellow-400/20">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
               </div>
-              <p className="text-yellow-300/80 text-lg">No developers found</p>
-              <p className="text-yellow-300/60 text-sm">Add your first developer to get started</p>
+              <h3 className="text-2xl font-bold bg-gradient-to-r from-yellow-400 to-yellow-200 bg-clip-text text-transparent">All Developers ({developers.length})</h3>
+            </div>
+            <button
+              onClick={() => setShowForm(true)}
+              className="flex items-center space-x-2 bg-gradient-to-r from-yellow-400 to-yellow-500 text-gray-900 px-4 py-2 rounded-lg hover:from-yellow-300 hover:to-yellow-400 transition-all duration-300 font-medium shadow-md hover:shadow-lg"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              <span>Add New Developer</span>
+            </button>
+          </div>
+        </div>
+        <div className="p-8">
+          {developers.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-yellow-400/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+              </div>
+              <div className="text-yellow-300 text-lg font-medium">No developers found</div>
+              <p className="text-yellow-300/60 mt-2">Add your first developer to get started</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-yellow-400/30">
-                    <th className="text-left py-3 px-4 font-medium text-yellow-300">Name</th>
-                    <th className="text-left py-3 px-4 font-medium text-yellow-300">Established</th>
-                    <th className="text-left py-3 px-4 font-medium text-yellow-300">Total Projects</th>
-                    <th className="text-left py-3 px-4 font-medium text-yellow-300">Contact</th>
-                    <th className="text-right py-3 px-4 font-medium text-yellow-300">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {developers.map((developer) => (
-                    <tr key={developer._id} className="border-b border-yellow-400/10 hover:bg-yellow-400/5 transition-colors">
-                      <td className="py-4 px-4">
-                        <div>
-                          <p className="text-yellow-100 font-medium">{developer.name}</p>
-                          <p className="text-yellow-300/70 text-sm">{developer.description}</p>
-                        </div>
-                      </td>
-                      <td className="py-4 px-4 text-yellow-100">
-                        {developer.established_year || 'N/A'}
-                      </td>
-                      <td className="py-4 px-4 text-yellow-100">
-                        {developer.projects_count?.total || developer.totalProjects || 0}
-                      </td>
-                      <td className="py-4 px-4">
-                        <div className="text-yellow-100">
-                          <p className="text-sm">{developer.contact_info?.email || developer.email}</p>
-                          <p className="text-sm text-yellow-300/70">{developer.contact_info?.mobile_no || developer.mobile_no}</p>
-                        </div>
-                      </td>
-                      <td className="py-4 px-4 text-right">
-                        <div className="flex items-center justify-end space-x-2">
-                          <button
-                            onClick={() => handleEdit(developer)}
-                            className="p-2 text-yellow-400 hover:bg-yellow-400/10 rounded-lg transition-colors"
-                            title="Edit Developer"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => handleDelete(developer._id)}
-                            className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
-                            title="Delete Developer"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="grid gap-6">
+              {developers.map((developer) => (
+                <GenericCard
+                  key={developer._id}
+                  item={developer}
+                  type="developer"
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  onPublishToggle={handlePublishToggle}
+                  titleField="name"
+                  subtitleField="established_year"
+                  descriptionField="description"
+                  imageField="logo"
+                  fields={[
+                    { key: 'projects_count.total', label: 'Total Projects', className: 'text-yellow-300' },
+                    { key: 'contact_info.email', label: 'Email', className: 'text-yellow-300/70' },
+                    { key: 'contact_info.mobile_no', label: 'Phone', className: 'text-yellow-300/70' }
+                  ]}
+                  actions={['publish', 'edit', 'delete']}
+                />
+              ))}
             </div>
           )}
         </div>
       </div>
     </div>
   );
-
 }
 
 export default DeveloperManagement

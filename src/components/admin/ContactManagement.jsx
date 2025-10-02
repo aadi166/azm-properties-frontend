@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { toast } from 'react-hot-toast'
 import { apiService } from '../../services/api'
+import GenericCard from './GenericCard'
+import GenericModal from './GenericModal'
 
 const ContactManagement = () => {
   const [contacts, setContacts] = useState([])
@@ -10,14 +12,6 @@ const ContactManagement = () => {
   const [showForm, setShowForm] = useState(false)
   const [editingContact, setEditingContact] = useState(null)
   const [showEditForm, setShowEditForm] = useState(false)
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    subject: '',
-    message: '',
-    status: 'new' // Default status is 'new'
-  })
 
   // Fetch contacts from API
   useEffect(() => {
@@ -71,17 +65,16 @@ const ContactManagement = () => {
     setShowEditForm(true)
   }
 
-  const handleEditSubmit = async (e) => {
-    e.preventDefault()
+  const handleEditSubmit = async (submitData) => {
     try {
       // Make sure isEdited property is included in the update
-      const contactToUpdate = {...editingContact, isEdited: true}
-      const response = await apiService.updateContact(contactToUpdate._id, contactToUpdate)
+      const contactToUpdate = {...submitData, isEdited: true}
+      const response = await apiService.updateContact(editingContact._id, contactToUpdate)
 
       if (response.success) {
         // Update the contacts list with the edited contact including all updated fields
-        setContacts(contacts.map(contact => 
-          contact._id === contactToUpdate._id ? {...contactToUpdate, isEdited: true} : contact
+        setContacts(contacts.map(contact =>
+          contact._id === editingContact._id ? {...contactToUpdate, _id: editingContact._id} : contact
         ))
         toast.success('Contact updated successfully')
       } else {
@@ -152,197 +145,148 @@ const ContactManagement = () => {
   }
 
   return (
-    <div className="bg-black shadow rounded-lg border border-yellow-400/30">
+    <>
+      <div className="space-y-6">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-yellow-400/30">
-        <div className="flex justify-between items-center">
-          <h2 className="text-lg font-medium text-yellow-400">Contact Management</h2>
-          <div className="text-sm text-yellow-300/70">
-            Total Contacts: {contacts.length}
-          </div>
-        </div>
-      </div>
 
       {/* Contacts List */}
-      <div className="overflow-x-auto">
-        {contacts.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="text-yellow-300/70 text-lg mb-2">No contacts found</div>
-            <p className="text-yellow-300/50">Contact submissions will appear here</p>
+      <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 rounded-2xl shadow-2xl border border-yellow-400/30 backdrop-blur-sm">
+        <div className="px-8 py-6 border-b border-yellow-400/20">
+          <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-lg flex items-center justify-center">
+              <svg className="w-5 h-5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <h3 className="text-2xl font-bold bg-gradient-to-r from-yellow-400 to-yellow-200 bg-clip-text text-transparent">All Contacts ({contacts.length})</h3>
           </div>
-        ) : (
-          <table className="min-w-full divide-y divide-yellow-400/30">
-            <thead className="bg-gray-900">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-yellow-400 uppercase tracking-wider">
-                  Contact Info
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-yellow-400 uppercase tracking-wider">
-                  Subject
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-yellow-400 uppercase tracking-wider">
-                  Message
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-yellow-400 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-yellow-400 uppercase tracking-wider">
-                  Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-yellow-400 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-black divide-y divide-yellow-400/30">
+        </div>
+        <div className="p-8">
+          {contacts.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-yellow-400/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div className="text-yellow-300 text-lg font-medium">No contacts found</div>
+              <p className="text-yellow-300/60 mt-2">Contact submissions will appear here</p>
+            </div>
+          ) : (
+            <div className="grid gap-6">
               {contacts.map((contact) => (
-                <tr key={contact._id} className="hover:bg-gray-800">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <div className="text-sm font-medium text-yellow-300">{contact.name}</div>
-                      <div className="text-sm text-yellow-300/70">{contact.email}</div>
-                      <div className="text-sm text-yellow-300/70">{contact.phone}</div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-sm text-yellow-300">{contact.subject}</div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-sm text-yellow-300 max-w-xs truncate" title={contact.message}>
-                      {contact.message}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {getStatusBadge(contact.status)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-yellow-300/70">
-                    {formatDate(contact.createdAt)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button
-                      onClick={() => handleEdit(contact)}
-                      className="text-yellow-400 hover:text-yellow-300 transition-colors mr-4"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(contact._id)}
-                      className="text-red-400 hover:text-red-300 transition-colors"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
+                <GenericCard
+                  key={contact._id}
+                  item={contact}
+                  type="contact"
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  titleField="name"
+                  subtitleField="subject"
+                  descriptionField="message"
+                  dateField="createdAt"
+                  fields={[
+                    { key: 'email', label: 'Email', className: 'text-yellow-300/70' },
+                    { key: 'phone', label: 'Phone', className: 'text-yellow-300/70' }
+                  ]}
+                  actions={['edit', 'delete']}
+                />
               ))}
-            </tbody>
-          </table>
-        )}
+            </div>
+          )}
+        </div>
+      </div>
       </div>
 
       {/* Edit Contact Modal */}
-      {showEditForm && editingContact && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Edit Contact</h3>
-              <form onSubmit={handleEditSubmit}>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Name
-                  </label>
-                  <input
-                    type="text"
-                    value={editingContact.name}
-                    onChange={(e) => setEditingContact({...editingContact, name: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                </div>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    value={editingContact.email}
-                    onChange={(e) => setEditingContact({...editingContact, email: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                </div>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Phone
-                  </label>
-                  <input
-                    type="tel"
-                    value={editingContact.phone}
-                    onChange={(e) => setEditingContact({...editingContact, phone: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Subject
-                  </label>
-                  <input
-                    type="text"
-                    value={editingContact.subject}
-                    onChange={(e) => setEditingContact({...editingContact, subject: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                </div>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Message
-                  </label>
-                  <textarea
-                    value={editingContact.message}
-                    onChange={(e) => setEditingContact({...editingContact, message: e.target.value})}
-                    rows={4}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                </div>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Status
-                  </label>
-                  <select
-                    value={editingContact.status}
-                    onChange={(e) => setEditingContact({...editingContact, status: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="new">New</option>
-                    <option value="contacted">Contacted</option>
-                    <option value="resolved">Resolved</option>
-                  </select>
-                </div>
-                <div className="flex justify-end space-x-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowEditForm(false)
-                      setEditingContact(null)
-                    }}
-                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                  >
-                    Update Contact
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      <GenericModal
+        isOpen={showEditForm}
+        onClose={() => {
+          setShowEditForm(false)
+          setEditingContact(null)
+        }}
+        title="Edit Contact"
+        onSubmit={handleEditSubmit}
+        submitButtonText="Update Contact"
+        sections={[
+          {
+            title: 'Contact Information',
+            fields: [
+              {
+                name: 'name',
+                label: 'Name',
+                type: 'text',
+                required: true,
+                placeholder: 'Enter full name'
+              },
+              {
+                name: 'email',
+                label: 'Email',
+                type: 'email',
+                required: true,
+                placeholder: 'Enter email address'
+              },
+              {
+                name: 'phone',
+                label: 'Phone',
+                type: 'tel',
+                placeholder: 'Enter phone number'
+              },
+              {
+                name: 'subject',
+                label: 'Subject',
+                type: 'text',
+                required: true,
+                placeholder: 'Enter subject'
+              }
+            ]
+          },
+          {
+            title: 'Message',
+            fields: [
+              {
+                name: 'message',
+                label: 'Message',
+                type: 'textarea',
+                required: true,
+                placeholder: 'Enter message',
+                rows: 4
+              }
+            ]
+          },
+          {
+            title: 'Status',
+            fields: [
+              {
+                name: 'status',
+                label: 'Status',
+                type: 'select',
+                options: [
+                  { value: 'new', label: 'New' },
+                  { value: 'contacted', label: 'Contacted' },
+                  { value: 'resolved', label: 'Resolved' }
+                ]
+              }
+            ]
+          }
+        ]}
+        initialData={editingContact ? {
+          name: editingContact.name,
+          email: editingContact.email,
+          phone: editingContact.phone || '',
+          subject: editingContact.subject,
+          message: editingContact.message,
+          status: editingContact.status
+        } : {
+          name: '',
+          email: '',
+          phone: '',
+          subject: '',
+          message: '',
+          status: 'new'
+        }}
+      />
+    </>
   )
 }
 

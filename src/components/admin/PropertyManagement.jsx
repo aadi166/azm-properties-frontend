@@ -1,36 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { toast } from 'react-hot-toast'
 import apiService from '../../services/api'
+import GenericCard from './GenericCard'
 
 const PropertyManagement = () => {
   const [properties, setProperties] = useState([])
   const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
   const [editingProperty, setEditingProperty] = useState(null)
-  const [activeFilter, setActiveFilter] = useState('all')
 
-  // Form state (merged from PropertyForm.jsx)
+  // Added missing form-related state and refs
   const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    price: '',
-    location: '',
-    image: '',
-    type: 'exclusive',
-    bedrooms: '',
-    bathrooms: '',
-    area: '',
-    features: [],
-    status: 'available',
-    developer: '',
-    completionDate: '',
-    paymentPlan: '',
-    roi: ''
+    title: '', description: '', price: '', location: '', image: '', type: 'exclusive', bedrooms: '', bathrooms: '', area: '', features: [], status: 'available', developer: '', completionDate: '', paymentPlan: '', roi: '', published: true
   })
+  const [newFeature, setNewFeature] = useState('')
   const [imageFile, setImageFile] = useState(null)
   const [imagePreview, setImagePreview] = useState('')
+  const [showForm, setShowForm] = useState(false)
   const fileInputRef = useRef(null)
-  const [newFeature, setNewFeature] = useState('')
 
   useEffect(() => {
     fetchProperties()
@@ -53,14 +39,15 @@ const PropertyManagement = () => {
         developer: editingProperty.developer || '',
         completionDate: editingProperty.completionDate || '',
         paymentPlan: editingProperty.paymentPlan || '',
-        roi: editingProperty.roi || ''
+        roi: editingProperty.roi || '',
+        published: editingProperty.published !== false
       })
       setImagePreview(editingProperty.image || '')
       setImageFile(null)
     } else {
       // Reset form when not editing
       setFormData({
-        title: '', description: '', price: '', location: '', image: '', type: 'exclusive', bedrooms: '', bathrooms: '', area: '', features: [], status: 'available', developer: '', completionDate: '', paymentPlan: '', roi: ''
+        title: '', description: '', price: '', location: '', image: '', type: 'exclusive', bedrooms: '', bathrooms: '', area: '', features: [], status: 'available', developer: '', completionDate: '', paymentPlan: '', roi: '', published: true
       })
       setImageFile(null)
       setImagePreview('')
@@ -117,6 +104,28 @@ const PropertyManagement = () => {
       setProperties(prev => prev.filter(p => p._id !== propertyId && p.id !== propertyId))
       toast.success('Property deleted (local)')
       try { window.dispatchEvent(new Event('propertiesUpdated')) } catch(e){}
+    }
+  }
+
+  const handlePublishToggle = async (propertyId) => {
+    try {
+      const property = properties.find(p => p._id === propertyId || p.id === propertyId)
+      if (!property) return
+
+      const newPublishedStatus = !property.published
+      const response = await apiService.updateProperty(propertyId, { published: newPublishedStatus })
+
+      if (response && response.success) {
+        toast.success(`Property ${newPublishedStatus ? 'published' : 'unpublished'} successfully`)
+        fetchProperties()
+        // notify other parts of the app to refresh properties
+        try { window.dispatchEvent(new Event('propertiesUpdated')) } catch(e){}
+      } else {
+        toast.error('Failed to update property status')
+      }
+    } catch (error) {
+      console.error('Error toggling property publish status:', error)
+      toast.error('Error updating property status')
     }
   }
 
@@ -194,17 +203,6 @@ const PropertyManagement = () => {
     }
   }
 
-  const filteredProperties = properties.filter(property => {
-    if (activeFilter === 'all') return true
-    return property.type === activeFilter
-  })
-
-  const filters = [
-    { id: 'all', label: 'All Properties', count: properties.length },
-    { id: 'exclusive', label: 'Exclusive Properties', count: properties.filter(p => p.type === 'exclusive').length },
-    { id: 'off-plan', label: 'Off-Plan Properties', count: properties.filter(p => p.type === 'off-plan').length }
-  ]
-
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -213,31 +211,12 @@ const PropertyManagement = () => {
     )
   }
 
-  // Render combined UI (header, modal form, list)
+  // Render combined UI (modal form, list)
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-black shadow rounded-lg p-6 border border-yellow-400/30">
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-bold text-yellow-400">Property Management</h2>
-            <p className="text-yellow-300/70 mt-1">Manage exclusive and off-plan properties</p>
-          </div>
-          <button
-            onClick={handleAddProperty}
-            className="bg-yellow-600 hover:bg-yellow-500 text-gray-900 px-6 py-3 rounded-lg font-medium transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center space-x-2"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            <span>Add Property</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Form Modal (inlined) */}
+    <>
       {showForm && (
-        <div className="bg-gray-800 rounded-2xl border border-yellow-400/30 max-w-4xl w-full mx-auto my-8 admin-modal-panel">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-gray-800 rounded-2xl border border-yellow-400/30 max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden admin-modal-panel">
           <div className="sticky top-0 bg-gray-800 p-6 border-b border-yellow-400/30 rounded-t-2xl">
             <h3 className="text-xl font-bold text-yellow-300">{editingProperty ? 'Edit Property' : 'Add New Property'}</h3>
           </div>
@@ -362,6 +341,25 @@ const PropertyManagement = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Publishing Options */}
+              <div className="border-b border-yellow-400/30 pb-6">
+                <h4 className="text-md font-medium text-yellow-300 mb-4">Publishing Options</h4>
+
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    id="published"
+                    name="published"
+                    checked={formData.published}
+                    onChange={(e) => setFormData(prev => ({ ...prev, published: e.target.checked }))}
+                    className="w-5 h-5 text-yellow-400 bg-gray-900 border-yellow-400/30 rounded focus:ring-yellow-400 focus:ring-2"
+                  />
+                  <label htmlFor="published" className="text-sm font-medium text-yellow-300 cursor-pointer">
+                    Publish immediately
+                  </label>
+                </div>
+              </div>
             </form>
           </div>
           <div className="modal-footer sticky bottom-0 bg-gray-800 p-6 border-t border-yellow-400/30 rounded-b-2xl">
@@ -369,68 +367,77 @@ const PropertyManagement = () => {
             <button type="submit" form="propertyForm" className="px-6 py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-gray-900 rounded-xl">{editingProperty ? 'Update Property' : 'Create Property'}</button>
           </div>
         </div>
+      </div>
       )}
 
-      {/* Property List (inlined) */}
-      <div className="bg-black shadow rounded-lg overflow-hidden border border-yellow-400/30">
-        <div className="px-6 py-4 border-b border-yellow-400/30">
-          <h3 className="text-lg font-medium text-green-400">Properties ({filteredProperties.length})</h3>
+      <div className="space-y-6">
+        {/* Property List */}
+        <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 rounded-2xl shadow-2xl border border-yellow-400/30 backdrop-blur-sm">
+        <div className="px-8 py-6 border-b border-yellow-400/20">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-lg flex items-center justify-center">
+                <svg className="w-5 h-5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold bg-gradient-to-r from-yellow-400 to-yellow-200 bg-clip-text text-transparent">All Properties ({properties.length})</h3>
+            </div>
+            <button
+              onClick={() => { setEditingProperty(null); setShowForm(true); }}
+              className="flex items-center space-x-2 bg-gradient-to-r from-yellow-400 to-yellow-500 text-gray-900 px-4 py-2 rounded-lg hover:from-yellow-300 hover:to-yellow-400 transition-all duration-300 font-medium shadow-md hover:shadow-lg"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              <span>Add Property</span>
+            </button>
+          </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-yellow-400/30">
-            <thead className="bg-gray-900">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-yellow-400 uppercase tracking-wider">Property</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-yellow-400 uppercase tracking-wider">Type</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-yellow-400 uppercase tracking-wider">Price</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-yellow-400 uppercase tracking-wider">Location</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-yellow-400 uppercase tracking-wider">Details</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-yellow-400 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-yellow-400 uppercase tracking-wider">Created</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-yellow-400 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-black divide-y divide-yellow-400/30">
-              {filteredProperties.map((property) => (
-                <tr key={property._id || property.id} className="hover:bg-gray-800">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 h-12 w-12 flex items-center justify-center">
-                        {property.image ? (
-                          <div title={typeof property.image === 'string' ? property.image : ''} className="px-2 py-1 rounded-lg bg-gray-700 text-xs text-yellow-300 max-w-full truncate">{typeof property.image === 'string' ? property.image.split('/').pop() : 'Uploaded'}</div>
-                        ) : (
-                          <div className="h-10 w-10 rounded-lg bg-gray-700 flex items-center justify-center"><span className="text-yellow-400 text-xs">No Image</span></div>
-                        )}
-                      </div>
-                      <div className="ml-4">
-                        <div className="text-sm font-medium text-yellow-300 max-w-xs truncate">{property.title}</div>
-                        <div className="text-sm text-yellow-300/70 max-w-xs truncate">{property.description}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap"><span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${property.type === 'off-plan' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>{property.type === 'off-plan' ? 'Off-Plan' : 'Exclusive'}</span></td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-yellow-300">{property.price ? new Intl.NumberFormat('en-AE',{style:'currency',currency:'AED',minimumFractionDigits:0}).format(property.price) : 'N/A'}</div>
-                    {property.roi && <div className="text-sm text-green-400">ROI: {property.roi}%</div>}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap"><div className="text-sm text-yellow-300">{property.location}</div></td>
-                  <td className="px-6 py-4 whitespace-nowrap"><div className="text-sm text-yellow-300">{property.bedrooms && `${property.bedrooms} bed`}{property.bedrooms && property.bathrooms && ' • '}{property.bathrooms && `${property.bathrooms} bath`}{property.area && <div className="text-sm text-yellow-300/70">{Number(property.area).toLocaleString()} sq ft</div>}</div></td>
-                  <td className="px-6 py-4 whitespace-nowrap"><span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${property.status === 'available' ? 'bg-green-100 text-green-800' : property.status === 'sold' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>{(property.status || 'Unknown').charAt(0).toUpperCase() + (property.status || '').slice(1)}</span></td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-yellow-300/70">{property.createdAt ? new Date(property.createdAt).toLocaleDateString() : 'N/A'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex justify-end space-x-2">
-                      <button onClick={() => handleEditProperty(property)} className="text-yellow-400 hover:text-yellow-300 transition-colors flex items-center space-x-1 mr-3"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg><span>Edit</span></button>
-                      <button onClick={() => handleDeleteProperty(property._id || property.id)} className="text-red-400 hover:text-red-300 transition-colors flex items-center space-x-1"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg><span>Delete</span></button>
-                    </div>
-                  </td>
-                </tr>
+        <div className="p-8">
+          {properties.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="w-16 h-16 bg-yellow-400/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+              </div>
+              <div className="text-yellow-300 text-lg font-medium">No properties found</div>
+              <p className="text-yellow-300/60 mt-2">Create your first property to get started</p>
+            </div>
+          ) : (
+            <div className="grid gap-6">
+              {properties.map((property) => (
+                <GenericCard
+                  key={property._id || property.id}
+                  item={property}
+                  type="property"
+                  onEdit={handleEditProperty}
+                  onDelete={handleDeleteProperty}
+                  onPublishToggle={handlePublishToggle}
+                  titleField="title"
+                  subtitleField="location"
+                  descriptionField="description"
+                  dateField="createdAt"
+                  imageField="image"
+                  fields={[
+                    { key: 'type', label: 'Type', className: 'text-yellow-300' },
+                    { key: 'price', label: 'Price', className: 'text-yellow-300 font-medium' },
+                    { key: 'bedrooms', label: 'Beds', className: 'text-yellow-300/70' },
+                    { key: 'bathrooms', label: 'Baths', className: 'text-yellow-300/70' },
+                    { key: 'area', label: 'Area', className: 'text-yellow-300/70' }
+                  ]}
+                  actions={['publish', 'edit', 'delete']}
+                />
               ))}
-            </tbody>
-          </table>
+            </div>
+          )}
         </div>
       </div>
     </div>
-  )
+  </>
+)
+
 }
 
 export default PropertyManagement

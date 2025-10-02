@@ -263,9 +263,9 @@ const Properties = () => {
   }, [])
 
   const filteredProperties = Array.isArray(properties) ? properties.filter(property => {
-    const offPlanMatch = property.category
-      ? String(property.category).toLowerCase().includes('off')
-      : true
+    // NOTE: This page should list ALL property categories. A prior off-plan only check
+    // (copied from Projects page) hid every item whose category didn't include 'off'.
+    // Removed that constraint so general properties display correctly.
     const typeMatch = filter === 'all' || property.category === filter
     const locationMatch = locationFilter === 'all' || property.location === locationFilter
   const projectMatch = projectFilter === 'all' || (property.projectName && property.projectName === projectFilter)
@@ -301,8 +301,14 @@ const Properties = () => {
       priceMatch = property.price > 10000000
     }
     
-    return offPlanMatch && typeMatch && locationMatch && projectMatch && developerMatch && bedroomsMatch && bathroomsMatch && statusMatch && offerTypeMatch && propertyTypeMatch && constructionStatusMatch && searchMatch && priceMatch
+    return typeMatch && locationMatch && projectMatch && developerMatch && bedroomsMatch && bathroomsMatch && statusMatch && offerTypeMatch && propertyTypeMatch && constructionStatusMatch && searchMatch && priceMatch
   }) : []
+
+  // Debug aid: if we have raw properties but nothing passes filters, log a hint once.
+  if (properties.length > 0 && filteredProperties.length === 0) {
+    // eslint-disable-next-line no-console
+    console.warn('[Properties] All items filtered out. Current raw count:', properties.length, 'Check active filters.');
+  }
 
   const sortedProperties = [...filteredProperties].sort((a, b) => {
     switch (sortBy) {
