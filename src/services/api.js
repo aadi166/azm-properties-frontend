@@ -198,25 +198,37 @@ class StaticApiService {
     }
 
     try {
-  const endpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.PROPERTY_CREATE}`;
+      const endpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.PROPERTY_CREATE}`;
 
-      // Ensure body is FormData (for file upload)
+      // Ensure body is FormData (for file upload) and normalize keys expected by backend
       let body = propertyData;
       if (!(propertyData instanceof FormData)) {
         const fd = new FormData();
-        Object.keys(propertyData).forEach(key => {
-          const v = propertyData[key];
-          if (Array.isArray(v)) {
-            v.forEach(item => fd.append(key, item));
-          } else if (v instanceof File) {
-            fd.append(key, v);
-          } else if (v !== undefined && v !== null) {
-            fd.append(key, v);
-          } else {
-            fd.append(key, '');
-          }
-        });
+        const src = propertyData || {};
+        const appendIf = (k, v) => { if (v !== undefined && v !== null && v !== '') fd.append(k, v); };
+
+        appendIf('title', src.title);
+        appendIf('description', src.description);
+        appendIf('price', src.price);
+        appendIf('location', src.location);
+        appendIf('property_type', src.property_type || src.type);
+        appendIf('offer_type', src.offer_type || 'Sale');
+        appendIf('bedrooms', src.bedrooms);
+        appendIf('bathrooms', src.bathrooms);
+        appendIf('size', src.size || src.area);
+        appendIf('area', src.areaName || src.area_text);
+        appendIf('status', src.status || 'available');
+        appendIf('project_id', src.project_id);
+        appendIf('developer_id', src.developer_id || src.developer);
+
+        // Features single JSON string
+        const features = Array.isArray(src.features) ? src.features : [];
+        fd.append('features', JSON.stringify(features));
+
+        if (src.image instanceof File) fd.append('image', src.image);
         body = fd;
+      } else {
+        // If FormData provided, ensure x-session-key header only; do not modify Content-Type
       }
 
       const resp = await fetch(endpoint, {
@@ -239,10 +251,10 @@ class StaticApiService {
           price: created.price || propertyData.price || 0,
           location: created.location || propertyData.location || '',
           image: created.image || propertyData.image || null,
-          type: created.type || propertyData.type || 'exclusive',
+          type: created.type || created.property_type || propertyData.type || propertyData.property_type || 'exclusive',
           bedrooms: created.bedrooms || propertyData.bedrooms || 0,
           bathrooms: created.bathrooms || propertyData.bathrooms || 0,
-          area: created.area || propertyData.area || 0,
+          area: created.size || created.area || propertyData.size || propertyData.area || 0,
           status: created.status || propertyData.status || 'available',
           createdAt: created.created_on ? new Date(created.created_on).toISOString() : new Date().toISOString(),
           updatedAt: created.updated_on ? new Date(created.updated_on).toISOString() : new Date().toISOString(),
@@ -305,6 +317,145 @@ class StaticApiService {
     } catch (error) {
       console.error('Error deleting property via API:', error);
       return this.createResponse(null, false, error && error.message ? error.message : 'Network error while deleting property');
+    }
+  }
+
+  // Property Images API methods
+  async loadStoredPropertyImages() {
+    try {
+      const storedImages = localStorage.getItem('property_images');
+      if (storedImages) {
+        const parsedImages = JSON.parse(storedImages);
+        return this.createResponse(parsedImages);
+      }
+      return this.createResponse([]);
+    } catch (error) {
+      console.error('Error loading stored property images:', error);
+      return this.createResponse([], false, 'Error loading stored property images');
+    }
+  }
+
+  async downloadPropertyImage(imageUrl, propertyId, propertyTitle) {
+    try {
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('adminToken');
+      if (!token) {
+        throw new Error('Missing access token. Please login again.');
+      }
+
+      const fullUrl = imageUrl.startsWith('http')
+        ? imageUrl
+        : `${API_CONFIG.BASE_URL}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
+
+      // Use x-session-key like normal for this API
+      let response = await fetch(fullUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'image/*',
+          'x-session-key': token
+        },
+        mode: 'cors'
+      });
+
+      // Optional fallback to Authorization in case server supports that header only
+      if (response.status === 401 || response.status === 403) {
+        response = await fetch(fullUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'image/*',
+            'Authorization': `Bearer ${token}`
+          },
+          mode: 'cors'
+        });
+      }
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        throw new Error(`Failed to download image: ${response.status} ${text}`);
+      }
+
+      const blob = await response.blob();
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          resolve({
+            id: propertyId,
+            name: propertyTitle,
+            dataUrl: reader.result,
+            mimeType: blob.type || 'image/jpeg',
+            downloadedAt: new Date().toISOString()
+          });
+        };
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error(`Error downloading image for ${propertyTitle}:`, error);
+      throw error;
+    }
+  }
+
+  async downloadAllPropertyImages() {
+    try {
+      // Fetch properties from API
+      const response = await this.getProperties();
+      if (!response || !response.data || !Array.isArray(response.data)) {
+        throw new Error('Invalid properties response');
+      }
+
+      const properties = response.data;
+      const downloadedImages = [];
+
+      // Download images for properties that have image URLs
+      for (const property of properties) {
+        if (property.image_url) {
+          try {
+            console.log(`Downloading image for ${property.title}...`);
+            const imageData = await this.downloadPropertyImage(
+              property.image_url,
+              property._id || property.id,
+              property.title
+            );
+            downloadedImages.push(imageData);
+          } catch (error) {
+            const msg = (error && error.message) || 'Unknown error';
+            if (msg.toLowerCase().includes('token') || msg.includes('401')) {
+              throw new Error('Authentication required to download images. Please login again.');
+            } else {
+              console.error(`Failed to download image for ${property.title}:`, error);
+            }
+          }
+        }
+      }
+
+      // Store downloaded images in localStorage
+      localStorage.setItem('property_images', JSON.stringify(downloadedImages));
+
+      return this.createResponse(downloadedImages, true, `Downloaded ${downloadedImages.length} property images`);
+    } catch (error) {
+      console.error('Error downloading property images:', error);
+      return this.createResponse([], false, error.message || 'Failed to download property images');
+    }
+  }
+
+  async clearStoredPropertyImages() {
+    localStorage.removeItem('property_images');
+    return this.createResponse(null, true, 'Cleared all stored property images');
+  }
+
+  async downloadPropertyImageFile(dataUrl, filenameBase) {
+    try {
+      // Derive extension from data URL mime type
+      const mime = dataUrl.split(';')[0].split(':')[1] || 'image/jpeg';
+      const ext = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg';
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = `${filenameBase}.${ext}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return this.createResponse(null, true, 'Image download initiated');
+    } catch (e) {
+      console.error('Error downloading property image file:', e);
+      return this.createResponse(null, false, 'Failed to trigger image download');
     }
   }
 
@@ -1211,6 +1362,169 @@ class StaticApiService {
     }
   }
 
+  // Developer Images API methods
+  async loadStoredDeveloperImages() {
+    try {
+      const storedImages = localStorage.getItem('developer_images');
+      if (storedImages) {
+        const parsedImages = JSON.parse(storedImages);
+        return this.createResponse(parsedImages);
+      }
+      return this.createResponse([]);
+    } catch (error) {
+      console.error('Error loading stored developer images:', error);
+      return this.createResponse([], false, 'Error loading stored developer images');
+    }
+  }
+
+  async downloadDeveloperImage(imageUrl, developerId, developerName, imageType = 'logo') {
+    try {
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('adminToken');
+      if (!token) {
+        throw new Error('Missing access token. Please login again.');
+      }
+
+      const fullUrl = imageUrl.startsWith('http')
+        ? imageUrl
+        : `${API_CONFIG.BASE_URL}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
+
+      // Use x-session-key like normal for this API
+      let response = await fetch(fullUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'image/*',
+          'x-session-key': token
+        },
+        mode: 'cors'
+      });
+
+      // Optional fallback to Authorization in case server supports that header only
+      if (response.status === 401 || response.status === 403) {
+        response = await fetch(fullUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'image/*',
+            'Authorization': `Bearer ${token}`
+          },
+          mode: 'cors'
+        });
+      }
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        throw new Error(`Failed to download image: ${response.status} ${text}`);
+      }
+
+      const blob = await response.blob();
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          resolve({
+            id: developerId,
+            name: developerName,
+            type: imageType,
+            dataUrl: reader.result,
+            mimeType: blob.type || 'image/jpeg',
+            downloadedAt: new Date().toISOString()
+          });
+        };
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error(`Error downloading ${imageType} image for ${developerName}:`, error);
+      throw error;
+    }
+  }
+
+  async downloadAllDeveloperImages() {
+    try {
+      // Fetch developers from API
+      const response = await this.getDevelopers();
+      if (!response || !response.data || !Array.isArray(response.data)) {
+        throw new Error('Invalid developers response');
+      }
+
+      const developers = response.data;
+      const downloadedImages = [];
+
+      // Download images for developers that have logo or cover image URLs
+      for (const developer of developers) {
+        // Download logo image if available
+        if (developer.logo_url) {
+          try {
+            console.log(`Downloading logo image for ${developer.name}...`);
+            const imageData = await this.downloadDeveloperImage(
+              developer.logo_url,
+              developer._id || developer.id,
+              developer.name,
+              'logo'
+            );
+            downloadedImages.push(imageData);
+          } catch (error) {
+            const msg = (error && error.message) || 'Unknown error';
+            if (msg.toLowerCase().includes('token') || msg.includes('401')) {
+              throw new Error('Authentication required to download images. Please login again.');
+            } else {
+              console.error(`Failed to download logo image for ${developer.name}:`, error);
+            }
+          }
+        }
+
+        // Download cover image if available
+        if (developer.cover_image_url) {
+          try {
+            console.log(`Downloading cover image for ${developer.name}...`);
+            const imageData = await this.downloadDeveloperImage(
+              developer.cover_image_url,
+              developer._id || developer.id,
+              developer.name,
+              'cover'
+            );
+            downloadedImages.push(imageData);
+          } catch (error) {
+            const msg = (error && error.message) || 'Unknown error';
+            if (msg.toLowerCase().includes('token') || msg.includes('401')) {
+              throw new Error('Authentication required to download images. Please login again.');
+            } else {
+              console.error(`Failed to download cover image for ${developer.name}:`, error);
+            }
+          }
+        }
+      }
+
+      // Store downloaded images in localStorage
+      localStorage.setItem('developer_images', JSON.stringify(downloadedImages));
+
+      return this.createResponse(downloadedImages, true, `Downloaded ${downloadedImages.length} developer images`);
+    } catch (error) {
+      console.error('Error downloading developer images:', error);
+      return this.createResponse([], false, error.message || 'Failed to download developer images');
+    }
+  }
+
+  async clearStoredDeveloperImages() {
+    localStorage.removeItem('developer_images');
+    return this.createResponse(null, true, 'Cleared all stored developer images');
+  }
+
+  async downloadDeveloperImageFile(dataUrl, filenameBase) {
+    try {
+      // Derive extension from data URL mime type
+      const mime = dataUrl.split(';')[0].split(':')[1] || 'image/jpeg';
+      const ext = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg';
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = `${filenameBase}.${ext}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return this.createResponse(null, true, 'Image download initiated');
+    } catch (e) {
+      console.error('Error downloading developer image file:', e);
+      return this.createResponse(null, false, 'Failed to trigger image download');
+    }
+  }
+
   // Testimonials API methods
   async getTestimonials(filters = {}) {
     try {
@@ -1256,6 +1570,10 @@ class StaticApiService {
             designation: testimonial.designation,
             image: testimonial.image,
             image_url: testimonial.image_url,
+            logo: testimonial.logo || testimonial.image || null,
+            cover_image: testimonial.cover_image || null,
+            logo_url: testimonial.logo_url || testimonial.image_url || null,
+            cover_image_url: testimonial.cover_image_url || null,
             published: testimonial.published !== false, // Default to true if not specified
             createdAt: new Date(testimonial.created_on).toISOString(),
             updatedAt: new Date(testimonial.updated_on).toISOString()
@@ -1378,6 +1696,10 @@ class StaticApiService {
           designation: data.response_data.designation,
           image: data.response_data.image,
           image_url: data.response_data.image_url,
+          logo: data.response_data.logo || data.response_data.image || null,
+          cover_image: data.response_data.cover_image || null,
+          logo_url: data.response_data.logo_url || data.response_data.image_url || null,
+          cover_image_url: data.response_data.cover_image_url || null,
           published: true, // Newly created testimonials are published by default
           createdAt: new Date(data.response_data.created_on).toISOString(),
           updatedAt: new Date(data.response_data.updated_on).toISOString()
@@ -1420,6 +1742,10 @@ class StaticApiService {
       designation: data.designation,
       image: data.image,
       image_url: data.image_url,
+      logo: data.logo || data.image || null,
+      cover_image: data.cover_image || null,
+      logo_url: data.logo_url || data.image_url || null,
+      cover_image_url: data.cover_image_url || null,
       published: data.published !== false,
       createdAt: data.created_on ? new Date(data.created_on).toISOString() : new Date().toISOString(),
       updatedAt: data.updated_on ? new Date(data.updated_on).toISOString() : new Date().toISOString()
@@ -1553,37 +1879,36 @@ class StaticApiService {
   }
 
   async deleteTestimonial(id) {
-    // If an admin token exists, call backend using DELETE and do NOT fallback to localStorage on failure
+    // If admin token exists, call backend delete endpoint and do NOT fallback to localStorage on failure
     const token = localStorage.getItem(STORAGE_KEYS.ADMIN_TOKEN) || localStorage.getItem('accessToken');
     if (token) {
       try {
-        // Use DELETE to the endpoint with id as query parameter (many servers accept query for DELETE)
-        const endpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.TESTIMONIAL_DELETE}?id=${encodeURIComponent(id)}`;
+        const endpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.TESTIMONIAL_DELETE}`;
+        // Try DELETE with JSON body (some servers accept body with DELETE)
         let response = await fetch(endpoint, {
           method: 'DELETE',
           headers: {
             'x-session-key': token,
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
           },
           body: JSON.stringify({ id })
         });
 
-        // If server does not allow DELETE (405), try POST fallback with JSON body { id }
-        if (response.status === 405) {
+        // If DELETE not allowed, try POST fallback
+        if (response.status === 405 || response.status === 404) {
           try {
-            const postEndpoint = `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.TESTIMONIAL_DELETE}`;
-            response = await fetch(postEndpoint, {
+            response = await fetch(endpoint, {
               method: 'POST',
               headers: {
-                'Content-Type': 'application/json',
                 'x-session-key': token,
+                'Content-Type': 'application/json',
                 'Accept': 'application/json'
               },
               body: JSON.stringify({ id })
             });
           } catch (postErr) {
-            console.error('POST fallback for delete failed:', postErr);
+            console.error('POST fallback for testimonial delete failed:', postErr);
             throw postErr;
           }
         }
@@ -1593,7 +1918,6 @@ class StaticApiService {
           return this.createResponse(null, true, data.response_message || 'Testimonial deleted successfully');
         }
 
-        // If the server returned a non-success response, surface the error to caller (no local fallback)
         const errMsg = (data && (data.response_message || data.message)) || `HTTP ${response.status}`;
         throw new Error(errMsg || 'Failed to delete testimonial');
       } catch (error) {
@@ -1602,16 +1926,196 @@ class StaticApiService {
       }
     }
 
-    // No admin token: fallback to localStorage
+    // No token: fallback to localStorage
     await simulateDelay();
     const testimonialsData = getFromStorage(STORAGE_KEYS.TESTIMONIALS);
     const filteredTestimonials = testimonialsData.filter(t => t._id !== id && t.id !== id);
 
     if (filteredTestimonials.length < testimonialsData.length) {
       saveToStorage(STORAGE_KEYS.TESTIMONIALS, filteredTestimonials);
-      return this.createResponse(null, true, 'Testimonial deleted successfully (local fallback)');
+      return this.createResponse(null, true, 'Testimonial deleted successfully (local)');
     } else {
       throw new Error('Testimonial not found');
+    }
+  }
+
+  // Testimonial Images API methods
+  async loadStoredImages() {
+    try {
+      const storedImages = localStorage.getItem('testimonial_images');
+      if (storedImages) {
+        const parsedImages = JSON.parse(storedImages);
+        return this.createResponse(parsedImages);
+      }
+      return this.createResponse([]);
+    } catch (error) {
+      console.error('Error loading stored images:', error);
+      return this.createResponse([], false, 'Error loading stored images');
+    }
+  }
+
+  async downloadImage(imageUrl, testimonialId, testimonialName) {
+    try {
+      const token = localStorage.getItem('accessToken') || localStorage.getItem('adminToken');
+      if (!token) {
+        throw new Error('Missing access token. Please login again.');
+      }
+
+      const fullUrl = imageUrl.startsWith('http')
+        ? imageUrl
+        : `${API_CONFIG.BASE_URL}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
+
+      // Use x-session-key like normal for this API
+      let response = await fetch(fullUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'image/*',
+          'x-session-key': token
+        },
+        mode: 'cors'
+      });
+
+      // Optional fallback to Authorization in case server supports that header only
+      if (response.status === 401 || response.status === 403) {
+        response = await fetch(fullUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'image/*',
+            'Authorization': `Bearer ${token}`
+          },
+          mode: 'cors'
+        });
+      }
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        throw new Error(`Failed to download image: ${response.status} ${text}`);
+      }
+
+      const blob = await response.blob();
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          resolve({
+            id: testimonialId,
+            name: testimonialName,
+            dataUrl: reader.result,
+            mimeType: blob.type || 'image/jpeg',
+            downloadedAt: new Date().toISOString()
+          });
+        };
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error(`Error downloading image for ${testimonialName}:`, error);
+      throw error;
+    }
+  }
+
+  async downloadAllImages() {
+    try {
+      // Fetch testimonials from API
+      const response = await this.getTestimonials();
+      if (!response || !response.testimonials || !Array.isArray(response.testimonials)) {
+        throw new Error('Invalid testimonials response');
+      }
+
+      const testimonials = response.testimonials;
+      const downloadedImages = [];
+
+      // Download images for testimonials that have image URLs
+      for (const testimonial of testimonials) {
+        // Download logo image if available
+        if (testimonial.logo_url) {
+          try {
+            console.log(`Downloading logo image for ${testimonial.name}...`);
+            const imageData = await this.downloadImage(
+              testimonial.logo_url,
+              `${testimonial._id || testimonial.id}_logo`,
+              `${testimonial.name}_logo`
+            );
+            downloadedImages.push(imageData);
+          } catch (error) {
+            const msg = (error && error.message) || 'Unknown error';
+            if (msg.toLowerCase().includes('token') || msg.includes('401')) {
+              throw new Error('Authentication required to download images. Please login again.');
+            } else {
+              console.error(`Failed to download logo image for ${testimonial.name}:`, error);
+            }
+          }
+        }
+
+        // Download cover image if available
+        if (testimonial.cover_image_url) {
+          try {
+            console.log(`Downloading cover image for ${testimonial.name}...`);
+            const imageData = await this.downloadImage(
+              testimonial.cover_image_url,
+              `${testimonial._id || testimonial.id}_cover`,
+              `${testimonial.name}_cover`
+            );
+            downloadedImages.push(imageData);
+          } catch (error) {
+            const msg = (error && error.message) || 'Unknown error';
+            if (msg.toLowerCase().includes('token') || msg.includes('401')) {
+              throw new Error('Authentication required to download images. Please login again.');
+            } else {
+              console.error(`Failed to download cover image for ${testimonial.name}:`, error);
+            }
+          }
+        }
+
+        // Fallback to original image_url if no logo/cover images
+        if (!testimonial.logo_url && !testimonial.cover_image_url && testimonial.image_url) {
+          try {
+            console.log(`Downloading image for ${testimonial.name}...`);
+            const imageData = await this.downloadImage(
+              testimonial.image_url,
+              testimonial._id || testimonial.id,
+              testimonial.name
+            );
+            downloadedImages.push(imageData);
+          } catch (error) {
+            const msg = (error && error.message) || 'Unknown error';
+            if (msg.toLowerCase().includes('token') || msg.includes('401')) {
+              throw new Error('Authentication required to download images. Please login again.');
+            } else {
+              console.error(`Failed to download image for ${testimonial.name}:`, error);
+            }
+          }
+        }
+      }
+
+      // Store downloaded images in localStorage
+      localStorage.setItem('testimonial_images', JSON.stringify(downloadedImages));
+
+      return this.createResponse(downloadedImages, true, `Downloaded ${downloadedImages.length} testimonial images`);
+    } catch (error) {
+      console.error('Error downloading images:', error);
+      return this.createResponse([], false, error.message || 'Failed to download testimonial images');
+    }
+  }
+
+  async clearStoredImages() {
+    localStorage.removeItem('testimonial_images');
+    return this.createResponse(null, true, 'Cleared all stored testimonial images');
+  }
+
+  async downloadImageFile(dataUrl, filenameBase) {
+    try {
+      // Derive extension from data URL mime type
+      const mime = dataUrl.split(';')[0].split(':')[1] || 'image/jpeg';
+      const ext = mime === 'image/png' ? 'png' : mime === 'image/webp' ? 'webp' : 'jpg';
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = `${filenameBase}.${ext}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return this.createResponse(null, true, 'Image download initiated');
+    } catch (e) {
+      console.error('Error downloading image file:', e);
+      return this.createResponse(null, false, 'Failed to trigger image download');
     }
   }
 
@@ -1995,6 +2499,11 @@ export const {
   createProperty,
   updateProperty,
   deleteProperty,
+  loadStoredPropertyImages,
+  downloadPropertyImage,
+  downloadAllPropertyImages,
+  clearStoredPropertyImages,
+  downloadPropertyImageFile,
   submitContactForm,
   getContactSubmissions,
   getPosts,
@@ -2014,10 +2523,20 @@ export const {
   createDeveloper,
   updateDeveloper,
   deleteDeveloper,
+  loadStoredDeveloperImages,
+  downloadDeveloperImage,
+  downloadAllDeveloperImages,
+  clearStoredDeveloperImages,
+  downloadDeveloperImageFile,
   getTestimonials,
   createTestimonial,
   updateTestimonial,
   deleteTestimonial,
+  loadStoredImages,
+  downloadImage,
+  downloadAllImages,
+  clearStoredImages,
+  downloadImageFile,
   getWishlist,
   addToWishlist,
   removeFromWishlist,

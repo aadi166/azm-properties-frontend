@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { toast } from 'react-hot-toast'
 import apiService from '../../services/api'
 import GenericCard from './GenericCard'
-import GenericModal from './GenericModal'
 
 const DeveloperManagement = () => {
   const [developers, setDevelopers] = useState([])
@@ -116,6 +115,75 @@ const DeveloperManagement = () => {
     fetchDevelopers()
     fetchProjects()
   }, [])
+
+  useEffect(() => {
+    if (editingDeveloper) {
+      setFormData({
+        name: editingDeveloper.name,
+        description: editingDeveloper.description,
+        established_year: editingDeveloper.established_year || '',
+        // Map stored developer.name into about field for editing (treat `about` as name)
+        about: editingDeveloper.name || editingDeveloper.about || '',
+        projects_count: editingDeveloper.projects_count || {
+          total: 0,
+          completed: 0,
+          in_progress: 0
+        },
+        contact_info: editingDeveloper.contact_info || {
+          email: '',
+          mobile_no: '',
+          address: ''
+        },
+        logo: null,
+        cover_image: null,
+        image: null,
+        website: editingDeveloper.website || '',
+        email: editingDeveloper.email || '', // backward compatibility
+        mobile_no: editingDeveloper.mobile_no || '', // backward compatibility
+        address: editingDeveloper.address || '', // backward compatibility
+        published: editingDeveloper.published !== false
+      })
+      // Prefill selected projects from developer record if available
+      const existingProjectIds = []
+      if (Array.isArray(editingDeveloper.projects)) {
+        editingDeveloper.projects.forEach(p => {
+          if (typeof p === 'string') existingProjectIds.push(p)
+          else if (p && (p._id || p.id)) existingProjectIds.push(p._id || p.id)
+        })
+      } else if (Array.isArray(editingDeveloper.project_ids)) {
+        editingDeveloper.project_ids.forEach(pid => existingProjectIds.push(pid))
+      } else if (Array.isArray(editingDeveloper.projects_ids)) {
+        editingDeveloper.projects_ids.forEach(pid => existingProjectIds.push(pid))
+      }
+      setSelectedProjectIds(existingProjectIds)
+    } else {
+      setFormData({
+        name: '',
+        description: '',
+        established_year: '',
+        about: '',
+        projects_count: {
+          total: 0,
+          completed: 0,
+          in_progress: 0
+        },
+        contact_info: {
+          email: '',
+          mobile_no: '',
+          address: ''
+        },
+        logo: null,
+        cover_image: null,
+        image: null,
+        website: '',
+        email: '', // backward compatibility
+        mobile_no: '', // backward compatibility
+        address: '', // backward compatibility
+        published: true
+      })
+      setSelectedProjectIds([])
+    }
+  }, [editingDeveloper])
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -248,32 +316,9 @@ const DeveloperManagement = () => {
     }
   }
 
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      description: '',
-      established_year: '',
-      about: '',
-      projects_count: {
-        total: 0,
-        completed: 0,
-        in_progress: 0
-      },
-      contact_info: {
-        email: '',
-        mobile_no: '',
-        address: ''
-      },
-      logo: null,
-      cover_image: null,
-      image: null,
-      website: '',
-      email: '', // backward compatibility
-      mobile_no: '', // backward compatibility
-      address: '', // backward compatibility
-      published: true
-    })
-    setSelectedProjectIds([])
+  const handleCancelForm = () => {
+    setShowForm(false)
+    setEditingDeveloper(null)
   }
 
   // Note: client-side project filters/search removed per admin UX decision.
@@ -299,325 +344,315 @@ const DeveloperManagement = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      {/* Inline Add/Edit Form */}
+      {/* Developer Form */}
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-gray-800 rounded-2xl border border-yellow-400/30 max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden admin-modal-panel">
-          <div className="sticky top-0 bg-gray-800 p-6 border-b border-yellow-400/30 rounded-t-2xl">
+        <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 rounded-2xl shadow-2xl border border-yellow-400/30 backdrop-blur-sm">
+          <div className="p-6 border-b border-yellow-400/30">
             <h3 className="text-xl font-bold text-yellow-300">
               {editingDeveloper ? 'Edit Developer' : 'Add New Developer'}
             </h3>
           </div>
+          <form onSubmit={handleSubmit} className="space-y-6 p-6">
+            {/* Basic Information */}
+            <div className="border-b border-yellow-400/30 pb-6">
+              <h4 className="text-md font-medium text-yellow-300 mb-4">Basic Information</h4>
 
-          <div className="modal-body max-h-96 overflow-y-auto">
-            <form id="developerForm" onSubmit={handleSubmit} className="space-y-6 p-6">
-              {/* Basic Information */}
-              <div className="border-b border-yellow-400/30 pb-6">
-                <h4 className="text-md font-medium text-yellow-300 mb-4">Basic Information</h4>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-yellow-300 mb-1">
-                      Name *
-                    </label>
-                    <input
-                      type="text"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      required
-                      className={`w-full bg-gray-900/50 border rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 transition-all duration-300 backdrop-blur-sm ${
-                        !editingDeveloper && formData.name && developers.find(developer =>
-                          (developer.name || '').toLowerCase().trim() === formData.name.toLowerCase().trim()
-                        )
-                          ? 'border-red-400/50 focus:ring-red-400 focus:border-red-400'
-                          : 'border-yellow-400/30 focus:ring-yellow-400 focus:border-yellow-400'
-                      }`}
-                    />
-                    {!editingDeveloper && formData.name && developers.find(developer =>
-                      (developer.name || '').toLowerCase().trim() === formData.name.toLowerCase().trim()
-                    ) && (
-                      <p className="text-red-400 text-xs mt-1 flex items-center">
-                        <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                        </svg>
-                        This developer name already exists
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-yellow-300 mb-1">
-                      Established Year
-                    </label>
-                    <input
-                      type="number"
-                      name="established_year"
-                      value={formData.established_year}
-                      onChange={handleInputChange}
-                      min="1800"
-                      max={new Date().getFullYear()}
-                      placeholder="e.g. 2020"
-                      className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
                   <label className="block text-sm font-medium text-yellow-300 mb-1">
-                    Description
-                  </label>
-                  <textarea
-                    name="description"
-                    value={formData.description}
-                    onChange={handleInputChange}
-                    rows={3}
-                    placeholder="Brief description about the developer"
-                    className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
-                  />
-                </div>
-              </div>
-
-              {/* Projects Association */}
-              <div className="border-b border-yellow-400/30 pb-6">
-                <h4 className="text-md font-medium text-yellow-300 mb-4">Associated Projects</h4>
-                <p className="text-yellow-300/70 text-sm mb-3">Select projects this developer is involved in (multiple selection supported).</p>
-                <div className="grid grid-cols-1 gap-2">
-                  <div className="flex items-center space-x-2">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedProjectIds(projectsList.map(p => p._id || p.id))}
-                      className="px-3 py-1 bg-yellow-400 text-gray-900 rounded-lg text-sm hover:bg-yellow-300 transition-colors"
-                    >
-                      Select All
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedProjectIds([])}
-                      className="px-3 py-1 bg-gray-700 text-yellow-300 rounded-lg text-sm border border-yellow-400/20 hover:bg-gray-600 transition-colors"
-                    >
-                      Clear
-                    </button>
-                  </div>
-
-                  <div className="max-h-48 overflow-y-auto pr-2 border border-yellow-400/20 rounded-lg p-3 bg-gray-900/30">
-                    {projectsList.length === 0 ? (
-                      <p className="text-yellow-300/60 text-sm">No projects available</p>
-                    ) : (
-                      projectsList.map((project) => {
-                        const pid = project._id || project.id;
-                        const label = project.name || project.title || pid;
-                        return (
-                          <label key={pid} className="flex items-center space-x-2 mb-2 hover:bg-yellow-400/5 p-2 rounded cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={selectedProjectIds.includes(pid)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedProjectIds(prev => Array.from(new Set([...prev, pid])));
-                                } else {
-                                  setSelectedProjectIds(prev => prev.filter(x => x !== pid));
-                                }
-                              }}
-                              className="form-checkbox h-4 w-4 text-yellow-400 bg-gray-900 border-yellow-400/30 rounded focus:ring-yellow-400 focus:ring-2"
-                            />
-                            <span className="text-yellow-100 text-sm">{label}</span>
-                          </label>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Project Statistics */}
-              <div className="border-b border-yellow-400/30 pb-6">
-                <h4 className="text-md font-medium text-yellow-300 mb-4">Project Statistics</h4>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-yellow-300 mb-1">
-                      Total Projects
-                    </label>
-                    <input
-                      type="number"
-                      name="projects_count.total"
-                      value={formData.projects_count.total}
-                      onChange={handleInputChange}
-                      min="0"
-                      className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-yellow-300 mb-1">
-                      Completed Projects
-                    </label>
-                    <input
-                      type="number"
-                      name="projects_count.completed"
-                      value={formData.projects_count.completed}
-                      onChange={handleInputChange}
-                      min="0"
-                      className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-yellow-300 mb-1">
-                      In Progress Projects
-                    </label>
-                    <input
-                      type="number"
-                      name="projects_count.in_progress"
-                      value={formData.projects_count.in_progress}
-                      onChange={handleInputChange}
-                      min="0"
-                      className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Contact Information */}
-              <div className="border-b border-yellow-400/30 pb-6">
-                <h4 className="text-md font-medium text-yellow-300 mb-4">Contact Information</h4>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-yellow-300 mb-1">
-                      Mobile Number *
-                    </label>
-                    <input
-                      type="tel"
-                      name="contact_info.mobile_no"
-                      value={formData.contact_info.mobile_no}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-yellow-300 mb-1">
-                      Email *
-                    </label>
-                    <input
-                      type="email"
-                      name="contact_info.email"
-                      value={formData.contact_info.email}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-yellow-300 mb-1">
-                    Address
-                  </label>
-                  <textarea
-                    name="contact_info.address"
-                    value={formData.contact_info.address}
-                    onChange={handleInputChange}
-                    rows={2}
-                    placeholder="Complete Address"
-                    className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
-                  />
-                </div>
-
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-yellow-300 mb-1">
-                    Website
+                    Name *
                   </label>
                   <input
-                    type="url"
-                    name="website"
-                    value={formData.website}
+                    type="text"
+                    name="name"
+                    value={formData.name}
                     onChange={handleInputChange}
-                    placeholder="https://example.com"
+                    required
+                    className={`w-full bg-gray-900/50 border rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 transition-all duration-300 backdrop-blur-sm ${
+                      !editingDeveloper && formData.name && developers.find(developer =>
+                        (developer.name || '').toLowerCase().trim() === formData.name.toLowerCase().trim()
+                      )
+                        ? 'border-red-400/50 focus:ring-red-400 focus:border-red-400'
+                        : 'border-yellow-400/30 focus:ring-yellow-400 focus:border-yellow-400'
+                    }`}
+                  />
+                  {!editingDeveloper && formData.name && developers.find(developer =>
+                    (developer.name || '').toLowerCase().trim() === formData.name.toLowerCase().trim()
+                  ) && (
+                    <p className="text-red-400 text-xs mt-1 flex items-center">
+                      <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      This developer name already exists
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">
+                    Established Year
+                  </label>
+                  <input
+                    type="number"
+                    name="established_year"
+                    value={formData.established_year}
+                    onChange={handleInputChange}
+                    min="1800"
+                    max={new Date().getFullYear()}
+                    placeholder="e.g. 2020"
                     className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
                   />
                 </div>
               </div>
 
-              {/* Image Uploads */}
-              <div className="border-b border-yellow-400/30 pb-6">
-                <h4 className="text-md font-medium text-yellow-300 mb-4">Images</h4>
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-yellow-300 mb-1">
+                  Description
+                </label>
+                <textarea
+                  name="description"
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  rows={3}
+                  placeholder="Brief description about the developer"
+                  className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+                />
+              </div>
+            </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-yellow-300 mb-1">
-                      Logo
-                    </label>
-                    <input
-                      type="file"
-                      name="logo"
-                      onChange={handleInputChange}
-                      accept="image/*"
-                      className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-yellow-400 file:text-gray-900 hover:file:bg-yellow-300 transition-all duration-300 backdrop-blur-sm"
-                    />
-                  </div>
+            {/* Projects Association */}
+            <div className="border-b border-yellow-400/30 pb-6">
+              <h4 className="text-md font-medium text-yellow-300 mb-4">Associated Projects</h4>
+              <p className="text-yellow-300/70 text-sm mb-3">Select projects this developer is involved in (multiple selection supported).</p>
+              <div className="grid grid-cols-1 gap-2">
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProjectIds(projectsList.map(p => p._id || p.id))}
+                    className="px-3 py-1 bg-yellow-400 text-gray-900 rounded-lg text-sm hover:bg-yellow-300 transition-colors"
+                  >
+                    Select All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProjectIds([])}
+                    className="px-3 py-1 bg-gray-700 text-yellow-300 rounded-lg text-sm border border-yellow-400/20 hover:bg-gray-600 transition-colors"
+                  >
+                    Clear
+                  </button>
+                </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-yellow-300 mb-1">
-                      Cover Image
-                    </label>
-                    <input
-                      type="file"
-                      name="cover_image"
-                      onChange={handleInputChange}
-                      accept="image/*"
-                      className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-yellow-400 file:text-gray-900 hover:file:bg-yellow-300 transition-all duration-300 backdrop-blur-sm"
-                    />
-                  </div>
+                <div className="max-h-48 overflow-y-auto pr-2 border border-yellow-400/20 rounded-lg p-3 bg-gray-900/30">
+                  {projectsList.length === 0 ? (
+                    <p className="text-yellow-300/60 text-sm">No projects available</p>
+                  ) : (
+                    projectsList.map((project) => {
+                      const pid = project._id || project.id;
+                      const label = project.name || project.title || pid;
+                      return (
+                        <label key={pid} className="flex items-center space-x-2 mb-2 hover:bg-yellow-400/5 p-2 rounded cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedProjectIds.includes(pid)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedProjectIds(prev => Array.from(new Set([...prev, pid])));
+                              } else {
+                                setSelectedProjectIds(prev => prev.filter(x => x !== pid));
+                              }
+                            }}
+                            className="form-checkbox h-4 w-4 text-yellow-400 bg-gray-900 border-yellow-400/30 rounded focus:ring-yellow-400 focus:ring-2"
+                          />
+                          <span className="text-yellow-100 text-sm">{label}</span>
+                        </label>
+                      );
+                    })
+                  )}
                 </div>
               </div>
+            </div>
 
-              {/* Publishing Options */}
-              <div className="border-b border-yellow-400/30 pb-6">
-                <h4 className="text-md font-medium text-yellow-300 mb-4">Publishing Options</h4>
+            {/* Project Statistics */}
+            <div className="border-b border-yellow-400/30 pb-6">
+              <h4 className="text-md font-medium text-yellow-300 mb-4">Project Statistics</h4>
 
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    id="published"
-                    name="published"
-                    checked={formData.published}
-                    onChange={(e) => setFormData(prev => ({ ...prev, published: e.target.checked }))}
-                    className="w-5 h-5 text-yellow-400 bg-gray-900 border-yellow-400/30 rounded focus:ring-yellow-400 focus:ring-2"
-                  />
-                  <label htmlFor="published" className="text-sm font-medium text-yellow-300 cursor-pointer">
-                    Publish immediately
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">
+                    Total Projects
                   </label>
+                  <input
+                    type="number"
+                    name="projects_count.total"
+                    value={formData.projects_count.total}
+                    onChange={handleInputChange}
+                    min="0"
+                    className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">
+                    Completed Projects
+                  </label>
+                  <input
+                    type="number"
+                    name="projects_count.completed"
+                    value={formData.projects_count.completed}
+                    onChange={handleInputChange}
+                    min="0"
+                    className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">
+                    In Progress Projects
+                  </label>
+                  <input
+                    type="number"
+                    name="projects_count.in_progress"
+                    value={formData.projects_count.in_progress}
+                    onChange={handleInputChange}
+                    min="0"
+                    className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+                  />
                 </div>
               </div>
-            </form>
-          </div>
+            </div>
 
-          <div className="modal-footer sticky bottom-0 bg-gray-800 p-6 border-t border-yellow-400/30 rounded-b-2xl">
-            <button
-              type="button"
-              onClick={() => {
-                setShowForm(false);
-                setEditingDeveloper(null);
-                resetForm();
-              }}
-              className="px-6 py-3 border border-yellow-400/30 text-yellow-300 rounded-xl hover:bg-yellow-400/10 transition-all duration-300 backdrop-blur-sm"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              form="developerForm"
-              className="px-6 py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-gray-900 rounded-xl hover:from-yellow-300 hover:to-yellow-400 font-medium transition-all duration-300 shadow-lg hover:shadow-xl"
-            >
-              {editingDeveloper ? 'Update Developer' : 'Create Developer'}
-            </button>
-          </div>
-        </div>
+            {/* Contact Information */}
+            <div className="border-b border-yellow-400/30 pb-6">
+              <h4 className="text-md font-medium text-yellow-300 mb-4">Contact Information</h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">
+                    Mobile Number *
+                  </label>
+                  <input
+                    type="tel"
+                    name="contact_info.mobile_no"
+                    value={formData.contact_info.mobile_no}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">
+                    Email *
+                  </label>
+                  <input
+                    type="email"
+                    name="contact_info.email"
+                    value={formData.contact_info.email}
+                    onChange={handleInputChange}
+                    required
+                    className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-yellow-300 mb-1">
+                  Address
+                </label>
+                <textarea
+                  name="contact_info.address"
+                  value={formData.contact_info.address}
+                  onChange={handleInputChange}
+                  rows={2}
+                  placeholder="Complete Address"
+                  className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+                />
+              </div>
+
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-yellow-300 mb-1">
+                  Website
+                </label>
+                <input
+                  type="url"
+                  name="website"
+                  value={formData.website}
+                  onChange={handleInputChange}
+                  placeholder="https://example.com"
+                  className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+                />
+              </div>
+            </div>
+
+            {/* Image Uploads */}
+            <div className="border-b border-yellow-400/30 pb-6">
+              <h4 className="text-md font-medium text-yellow-300 mb-4">Images</h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">
+                    Logo
+                  </label>
+                  <input
+                    type="file"
+                    name="logo"
+                    onChange={handleInputChange}
+                    accept="image/*"
+                    className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-yellow-400 file:text-gray-900 hover:file:bg-yellow-300 transition-all duration-300 backdrop-blur-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">
+                    Cover Image
+                  </label>
+                  <input
+                    type="file"
+                    name="cover_image"
+                    onChange={handleInputChange}
+                    accept="image/*"
+                    className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-yellow-400 file:text-gray-900 hover:file:bg-yellow-300 transition-all duration-300 backdrop-blur-sm"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Publishing Options */}
+            <div className="border-b border-yellow-400/30 pb-6">
+              <h4 className="text-md font-medium text-yellow-300 mb-4">Publishing Options</h4>
+
+              <div className="flex items-center space-x-3">
+                <input
+                  type="checkbox"
+                  id="published"
+                  name="published"
+                  checked={formData.published}
+                  onChange={(e) => setFormData(prev => ({ ...prev, published: e.target.checked }))}
+                  className="w-5 h-5 text-yellow-400 bg-gray-900 border-yellow-400/30 rounded focus:ring-yellow-400 focus:ring-2"
+                />
+                <label htmlFor="published" className="text-sm font-medium text-yellow-300 cursor-pointer">
+                  Publish immediately
+                </label>
+              </div>
+            </div>
+
+            {/* Form Actions */}
+            <div className="flex justify-end space-x-4">
+              <button
+                type="button"
+                onClick={handleCancelForm}
+                className="px-6 py-3 border border-yellow-400/30 text-yellow-300 rounded-xl hover:bg-yellow-400/10 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-6 py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-gray-900 rounded-xl hover:from-yellow-300 hover:to-yellow-400 transition-all duration-300"
+              >
+                {editingDeveloper ? 'Update Developer' : 'Create Developer'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 

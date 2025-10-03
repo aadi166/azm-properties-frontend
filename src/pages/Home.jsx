@@ -170,7 +170,33 @@ const Home = () => {
       if (result.testimonials && Array.isArray(result.testimonials)) {
         // Filter only published testimonials
         const publishedTestimonials = result.testimonials.filter(testimonial => testimonial.published !== false)
-        setTestimonials(publishedTestimonials)
+
+        // Load downloaded testimonial images and match them with testimonials
+        try {
+          const storedImagesResult = await apiService.loadStoredImages()
+          if (storedImagesResult.success && storedImagesResult.data && Array.isArray(storedImagesResult.data)) {
+            const storedImages = storedImagesResult.data
+
+            // Match stored images with testimonials by ID
+            const testimonialsWithImages = publishedTestimonials.map(testimonial => {
+              const matchingImage = storedImages.find(img => img.id === testimonial._id || img.id === testimonial.id)
+              if (matchingImage) {
+                return {
+                  ...testimonial,
+                  image: matchingImage.dataUrl // Use the downloaded image data URL
+                }
+              }
+              return testimonial // Return testimonial as-is if no matching downloaded image
+            })
+
+            setTestimonials(testimonialsWithImages)
+          } else {
+            setTestimonials(publishedTestimonials)
+          }
+        } catch (imageError) {
+          console.warn('Error loading stored testimonial images:', imageError)
+          setTestimonials(publishedTestimonials)
+        }
       } else {
         // No fallback available
         setTestimonials([])
@@ -433,7 +459,19 @@ const Home = () => {
               onClick={() => handleDeveloperClick(developer)}
             >
               {/* Developer Card */}
-              <div className="relative bg-gradient-to-br from-white/6 to-white/3 backdrop-blur-sm border border-gold-500/20 rounded-xl sm:rounded-2xl p-4 sm:p-6 lg:p-4 h-full transition-all duration-500 hover:border-gold-400/40 hover:bg-gradient-to-br hover:from-gold-500/10 hover:to-gold-400/5 hover:scale-105 hover:shadow-2xl hover:shadow-gold-500/20 cursor-pointer">
+              <div className="relative bg-gradient-to-br from-white/6 to-white/3 backdrop-blur-sm border border-gold-500/20 rounded-xl sm:rounded-2xl p-4 sm:p-6 lg:p-4 h-full transition-all duration-500 hover:border-gold-400/40 hover:bg-gradient-to-br hover:from-gold-500/10 hover:to-gold-400/5 hover:scale-105 hover:shadow-2xl hover:shadow-gold-500/20 cursor-pointer overflow-hidden">
+
+                {/* Cover Image */}
+                <div className="relative mb-3 sm:mb-4 lg:mb-3 h-20 sm:h-24 lg:h-20 rounded-lg sm:rounded-xl overflow-hidden">
+                  {developer.cover_image ? (
+                    <img src={developer.cover_image} alt={`${developer.name} cover`} className="w-full h-full object-cover group-hover:scale-110 transition-all duration-300" loading="lazy" />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-gold-500/20 to-gold-400/10 flex items-center justify-center">
+                      <div className="text-gold-400 text-xs font-semibold">Cover Image</div>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300"></div>
+                </div>
 
                 {/* Logo Container or placeholder */}
                 <div className="relative mb-3 sm:mb-4 lg:mb-3">
@@ -479,48 +517,76 @@ const Home = () => {
     {selectedDev && (
       <div className="fixed inset-0 z-50 flex items-center justify-center">
         <div className="absolute inset-0 bg-black/60" onClick={closeDeveloperModal}></div>
-        <div className="relative bg-gray-900 rounded-2xl border border-yellow-400/20 max-w-3xl w-full mx-4 p-6 z-10">
-          <div className="flex justify-between items-start">
-            <div>
-              <h3 className="text-2xl font-bold text-white">{selectedDev.name}</h3>
-              <p className="text-yellow-300/70 text-sm">{selectedDev.description}</p>
-            </div>
-            <button onClick={closeDeveloperModal} className="text-yellow-300 text-sm px-3 py-1">Close</button>
-          </div>
-
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <h4 className="text-yellow-300 font-medium mb-2">Overview</h4>
-              <p className="text-gray-300 text-sm leading-relaxed">{selectedDev.about || selectedDev.description}</p>
-
-              <div className="mt-3 text-sm text-yellow-100">
-                <div><strong>Established:</strong> {selectedDev.established || selectedDev.established_year || selectedDev.createdAt?.slice(0,4) || 'N/A'}</div>
-                <div className="mt-1"><strong>Total Projects:</strong> {selectedDev.totalProjects || selectedDev.total_projects || selectedDev.totalProjects || 'N/A'}</div>
-                {selectedDev.specialties && <div className="mt-1"><strong>Specialties:</strong> {(selectedDev.specialties || []).join(', ')}</div>}
+        <div className="relative bg-gray-900 rounded-2xl border border-yellow-400/20 max-w-4xl w-full mx-4 p-6 z-10">
+          {/* Cover Image Header */}
+          {selectedDev.cover_image && (
+            <div className="relative h-32 sm:h-40 rounded-xl overflow-hidden mb-6">
+              <img src={selectedDev.cover_image} alt={`${selectedDev.name} cover`} className="w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+              <div className="absolute bottom-4 left-4 right-4">
+                <h3 className="text-2xl font-bold text-white">{selectedDev.name}</h3>
+                <p className="text-yellow-300/70 text-sm">{selectedDev.description}</p>
               </div>
-            </div>
-
-            <div>
-              <h4 className="text-yellow-300 font-medium mb-2">Contact</h4>
-              <div className="text-sm text-yellow-100">
-                {selectedDev.contact?.website && <div><a href={selectedDev.contact.website} target="_blank" rel="noreferrer" className="text-gold-400 underline">Visit Website</a></div>}
-                {selectedDev.contact?.phone && <div className="mt-1">Phone: {selectedDev.contact.phone}</div>}
-                {selectedDev.contact?.email && <div className="mt-1">Email: {selectedDev.contact.email}</div>}
-                {selectedDev.contact?.address && <div className="mt-1">Address: {selectedDev.contact.address.street || selectedDev.contact.address}</div>}
-              </div>
-            </div>
-          </div>
-
-          {selectedDev.projects && selectedDev.projects.length > 0 && (
-            <div className="mt-4">
-              <h4 className="text-yellow-300 font-medium mb-2">Projects</h4>
-              <ul className="list-disc list-inside text-gray-300 text-sm">
-                {selectedDev.projects.map((p, i) => (
-                  <li key={i}>{p.name || p.title || p.projectName || 'Untitled Project'}</li>
-                ))}
-              </ul>
             </div>
           )}
+
+          <div className="flex justify-between items-start mb-4">
+            {!selectedDev.cover_image && (
+              <div>
+                <h3 className="text-2xl font-bold text-white">{selectedDev.name}</h3>
+                <p className="text-yellow-300/70 text-sm">{selectedDev.description}</p>
+              </div>
+            )}
+            <button onClick={closeDeveloperModal} className="text-yellow-300 text-sm px-3 py-1 hover:bg-yellow-400/10 rounded">Close</button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h4 className="text-yellow-300 font-medium mb-3">Overview</h4>
+              <p className="text-gray-300 text-sm leading-relaxed mb-4">{selectedDev.about || selectedDev.description}</p>
+
+              {/* Logo Display */}
+              {selectedDev.logo && (
+                <div className="mb-4">
+                  <div className="w-20 h-20 bg-white/95 rounded-lg flex items-center justify-center p-2">
+                    <img src={selectedDev.logo} alt={selectedDev.name} className="max-w-full max-h-full object-contain" />
+                  </div>
+                </div>
+              )}
+
+              <div className="text-sm text-yellow-100 space-y-2">
+                <div><strong>Established:</strong> {selectedDev.established || selectedDev.established_year || selectedDev.createdAt?.slice(0,4) || 'N/A'}</div>
+                <div><strong>Total Projects:</strong> {selectedDev.projects_count?.total || selectedDev.totalProjects || selectedDev.total_projects || 'N/A'}</div>
+                {selectedDev.projects_count && (
+                  <div><strong>Completed:</strong> {selectedDev.projects_count.completed || 0} • <strong>In Progress:</strong> {selectedDev.projects_count.in_progress || 0}</div>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-yellow-300 font-medium mb-3">Contact Information</h4>
+              <div className="text-sm text-yellow-100 space-y-2">
+                {selectedDev.website && <div><a href={selectedDev.website} target="_blank" rel="noreferrer" className="text-gold-400 underline hover:text-gold-300">Visit Website</a></div>}
+                {selectedDev.contact_info?.email && <div><strong>Email:</strong> {selectedDev.contact_info.email}</div>}
+                {selectedDev.contact_info?.mobile_no && <div><strong>Phone:</strong> {selectedDev.contact_info.mobile_no}</div>}
+                {selectedDev.contact_info?.address && <div><strong>Address:</strong> {selectedDev.contact_info.address}</div>}
+              </div>
+
+              {selectedDev.projects && selectedDev.projects.length > 0 && (
+                <div className="mt-6">
+                  <h4 className="text-yellow-300 font-medium mb-3">Projects</h4>
+                  <div className="space-y-1">
+                    {selectedDev.projects.slice(0, 5).map((project, i) => (
+                      <div key={i} className="text-gray-300 text-sm">• {typeof project === 'string' ? project : project.name || project.title || 'Untitled Project'}</div>
+                    ))}
+                    {selectedDev.projects.length > 5 && (
+                      <div className="text-gray-400 text-xs mt-2">And {selectedDev.projects.length - 5} more projects...</div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     )}

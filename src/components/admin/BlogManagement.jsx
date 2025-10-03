@@ -1,14 +1,24 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { toast } from 'react-hot-toast'
 import { apiService, API_CONFIG } from '../../services/api'
 import GenericCard from './GenericCard'
-import GenericModal from './GenericModal'
 
 const BlogManagement = () => {
   const [blogs, setBlogs] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingBlog, setEditingBlog] = useState(null)
+  const [formData, setFormData] = useState({
+    title: '',
+    content: '',
+    category: 'Market Analysis',
+    tags: '',
+    image: null,
+    published: true
+  })
+  const [imageFile, setImageFile] = useState(null)
+  const [imagePreview, setImagePreview] = useState('')
+  const fileInputRef = useRef(null)
 
   const categories = [
     'Market Analysis',
@@ -21,6 +31,32 @@ const BlogManagement = () => {
   useEffect(() => {
     fetchBlogs()
   }, [])
+
+  useEffect(() => {
+    if (editingBlog) {
+      setFormData({
+        title: editingBlog.title || '',
+        content: editingBlog.content || '',
+        category: editingBlog.category || 'Market Analysis',
+        tags: editingBlog.tags ? editingBlog.tags.join(', ') : '',
+        image: null,
+        published: editingBlog.published !== false
+      })
+      setImagePreview(editingBlog.image || '')
+      setImageFile(null)
+    } else {
+      setFormData({
+        title: '',
+        content: '',
+        category: 'Market Analysis',
+        tags: '',
+        image: null,
+        published: true
+      })
+      setImageFile(null)
+      setImagePreview('')
+    }
+  }, [editingBlog])
 
   const fetchBlogs = async () => {
     try {
@@ -54,16 +90,22 @@ const BlogManagement = () => {
     }
   }
 
-  const handleSubmit = async (submitData) => {
+  const handleSubmit = async (e) => {
+    e.preventDefault()
     try {
+      const submitData = {
+        ...formData,
+        tags: formData.tags ? formData.tags.split(',').map(tag => tag.trim()) : []
+      }
+
       let response
       if (editingBlog) {
         // Use the existing local API for updates
         const formDataToSend = new FormData()
 
         Object.keys(submitData).forEach(key => {
-          if (key === 'image' && submitData[key]) {
-            formDataToSend.append('image', submitData[key])
+          if (key === 'image' && imageFile) {
+            formDataToSend.append('image', imageFile)
           } else if (key !== 'image') {
             formDataToSend.append(key, submitData[key])
           }
@@ -83,8 +125,8 @@ const BlogManagement = () => {
           const formDataToSend = new FormData()
 
           Object.keys(submitData).forEach(key => {
-            if (key === 'image' && submitData[key]) {
-              formDataToSend.append('image', submitData[key])
+            if (key === 'image' && imageFile) {
+              formDataToSend.append('image', imageFile)
             } else if (key !== 'image') {
               formDataToSend.append(key, submitData[key])
             }
@@ -98,7 +140,6 @@ const BlogManagement = () => {
         toast.success(`Blog ${editingBlog ? 'updated' : 'created'} successfully`)
         setShowForm(false)
         setEditingBlog(null)
-        resetForm()
         fetchBlogs()
       } else {
         toast.error(response.message || 'Failed to save blog')
@@ -112,6 +153,29 @@ const BlogManagement = () => {
   const handleEdit = (blog) => {
     setEditingBlog(blog)
     setShowForm(true)
+  }
+
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }))
+  }
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      setImageFile(file)
+      const reader = new FileReader()
+      reader.onloadend = () => setImagePreview(reader.result)
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleCancelForm = () => {
+    setShowForm(false)
+    setEditingBlog(null)
   }
 
   const handlePublishToggle = async (blogId, currentStatus) => {
@@ -178,7 +242,7 @@ const BlogManagement = () => {
   }
 
   const resetForm = () => {
-    // Form data is now handled by GenericModal
+    // Form data is now handled by state
   }
 
   if (loading) {
@@ -190,93 +254,90 @@ const BlogManagement = () => {
   }
 
   return (
-    <>
-      {/* Blog Modal */}
-      <GenericModal
-        isOpen={showForm}
-        onClose={() => {
-          setShowForm(false)
-          setEditingBlog(null)
-          resetForm()
-        }}
-        title={editingBlog ? 'Edit Blog Post' : 'Add New Blog Post'}
-        onSubmit={handleSubmit}
-        submitButtonText={editingBlog ? 'Update Blog' : 'Create Blog'}
-        sections={[
-          {
-            title: 'Basic Information',
-            fields: [
-              {
-                name: 'title',
-                label: 'Title',
-                type: 'text',
-                required: true,
-                placeholder: 'Enter blog title'
-              },
-              {
-                name: 'category',
-                label: 'Category',
-                type: 'select',
-                required: true,
-                options: categories.map(cat => ({ value: cat, label: cat }))
-              },
-              {
-                name: 'content',
-                label: 'Content',
-                type: 'textarea',
-                required: true,
-                placeholder: 'Write your blog content here...',
-                rows: 6
-              },
-              {
-                name: 'tags',
-                label: 'Tags (comma separated)',
-                type: 'text',
-                placeholder: 'dubai, real estate, investment'
-              }
-            ]
-          },
-          {
-            title: 'Featured Image',
-            fields: [
-              {
-                name: 'image',
-                label: 'Blog Image',
-                type: 'file',
-                accept: 'image/*'
-              }
-            ]
-          },
-          {
-            title: 'Publishing Options',
-            fields: [
-              {
-                name: 'published',
-                label: 'Publish immediately',
-                type: 'checkbox'
-              }
-            ]
-          }
-        ]}
-        initialData={editingBlog ? {
-          title: editingBlog.title,
-          content: editingBlog.content,
-          category: editingBlog.category,
-          tags: editingBlog.tags ? editingBlog.tags.join(', ') : '',
-          image: null,
-          published: editingBlog.published !== false
-        } : {
-          title: '',
-          content: '',
-          category: 'Market Analysis',
-          tags: '',
-          image: null,
-          published: true
-        }}
-      />
+    <div className="space-y-6">
+      {/* Blog Form */}
+      {showForm && (
+        <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 rounded-2xl shadow-2xl border border-yellow-400/30 backdrop-blur-sm">
+          <div className="p-6 border-b border-yellow-400/30">
+            <h3 className="text-xl font-bold text-yellow-300">{editingBlog ? 'Edit Blog Post' : 'Add New Blog Post'}</h3>
+          </div>
+          <form onSubmit={handleSubmit} className="space-y-6 p-6">
+            {/* Basic Information */}
+            <div className="border-b border-yellow-400/30 pb-6">
+              <h4 className="text-md font-medium text-yellow-300 mb-4">Basic Information</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">Title *</label>
+                  <input type="text" name="title" required value={formData.title} onChange={handleChange} className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">Category *</label>
+                  <select name="category" required value={formData.category} onChange={handleChange} className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-400">
+                    {categories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-yellow-300 mb-1">Content *</label>
+                <textarea name="content" required rows={6} value={formData.content} onChange={handleChange} className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100" />
+              </div>
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-yellow-300 mb-1">Tags (comma separated)</label>
+                <input type="text" name="tags" value={formData.tags} onChange={handleChange} placeholder="dubai, real estate, investment" className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100" />
+              </div>
+            </div>
 
-      <div className="space-y-6">
-        {/* Blogs List */}
+            {/* Featured Image */}
+            <div className="border-b border-yellow-400/30 pb-6">
+              <h4 className="text-md font-medium text-yellow-300 mb-4">Featured Image</h4>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">Blog Image</label>
+                  <div className="flex items-center space-x-4">
+                    <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageChange} className="hidden" />
+                    <button type="button" onClick={() => fileInputRef.current.click()} className="px-6 py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-gray-900 rounded-xl">{imageFile ? 'Change Image' : 'Select Image'}</button>
+                    {imagePreview && (
+                      <div className="relative">
+                        <img src={imagePreview} alt="Blog preview" className="h-20 w-20 object-cover rounded-xl border border-yellow-400/30" />
+                        <button type="button" onClick={() => { setImageFile(null); setImagePreview(''); if (fileInputRef.current) fileInputRef.current.value = '' }} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">×</button>
+                      </div>
+                    )}
+                  </div>
+                  {!imagePreview && !imageFile && editingBlog?.image && <p className="text-sm text-yellow-300/60 mt-1">Current image will be used</p>}
+                </div>
+              </div>
+            </div>
+
+            {/* Publishing Options */}
+            <div className="border-b border-yellow-400/30 pb-6">
+              <h4 className="text-md font-medium text-yellow-300 mb-4">Publishing Options</h4>
+              <div className="flex items-center space-x-3">
+                <input
+                  type="checkbox"
+                  id="published"
+                  name="published"
+                  checked={formData.published}
+                  onChange={handleChange}
+                  className="w-5 h-5 text-yellow-400 bg-gray-900 border-yellow-400/30 rounded focus:ring-yellow-400 focus:ring-2"
+                />
+                <label htmlFor="published" className="text-sm font-medium text-yellow-300 cursor-pointer">
+                  Publish immediately
+                </label>
+              </div>
+            </div>
+
+            {/* Form Actions */}
+            <div className="flex justify-end space-x-4">
+              <button type="button" onClick={handleCancelForm} className="px-6 py-3 border border-yellow-400/30 text-yellow-300 rounded-xl hover:bg-yellow-400/10 transition-colors">Cancel</button>
+              <button type="submit" className="px-6 py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-gray-900 rounded-xl hover:from-yellow-300 hover:to-yellow-400 transition-all duration-300">{editingBlog ? 'Update Blog' : 'Create Blog'}</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Blogs List */}
       <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 rounded-2xl shadow-2xl border border-yellow-400/30 backdrop-blur-sm">
         <div className="px-8 py-6 border-b border-yellow-400/20">
           <div className="flex items-center justify-between">
@@ -336,9 +397,7 @@ const BlogManagement = () => {
         </div>
       </div>
     </div>
-  </>
-)
-
+  )
 }
 
 export default BlogManagement

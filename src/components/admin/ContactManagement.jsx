@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react'
 import { toast } from 'react-hot-toast'
 import { apiService } from '../../services/api'
 import GenericCard from './GenericCard'
-import GenericModal from './GenericModal'
 
 const ContactManagement = () => {
   const [contacts, setContacts] = useState([])
@@ -11,12 +10,59 @@ const ContactManagement = () => {
   const [statusFilter, setStatusFilter] = useState('all')
   const [showForm, setShowForm] = useState(false)
   const [editingContact, setEditingContact] = useState(null)
-  const [showEditForm, setShowEditForm] = useState(false)
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    subject: '',
+    message: '',
+    status: 'new'
+  })
 
   // Fetch contacts from API
   useEffect(() => {
     fetchContacts()
   }, [])
+
+  useEffect(() => {
+    if (editingContact) {
+      setFormData({
+        name: editingContact.name || '',
+        email: editingContact.email || '',
+        phone: editingContact.phone || '',
+        subject: editingContact.subject || '',
+        message: editingContact.message || '',
+        status: editingContact.status || 'new'
+      })
+    } else {
+      setFormData({
+        name: '',
+        email: '',
+        phone: '',
+        subject: '',
+        message: '',
+        status: 'new'
+      })
+    }
+  }, [editingContact])
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target
+    setFormData(prev => ({ ...prev, [name]: value }))
+  }
+
+  const handleCancelForm = () => {
+    setShowForm(false)
+    setEditingContact(null)
+    setFormData({
+      name: '',
+      email: '',
+      phone: '',
+      subject: '',
+      message: '',
+      status: 'new'
+    })
+  }
 
   const fetchContacts = async () => {
     try {
@@ -62,13 +108,15 @@ const ContactManagement = () => {
     // Mark the contact as edited when admin clicks edit button
     const updatedContact = {...contact, isEdited: true}
     setEditingContact(updatedContact)
-    setShowEditForm(true)
+    setShowForm(true)
   }
 
-  const handleEditSubmit = async (submitData) => {
+  const handleEditSubmit = async (e) => {
+    e.preventDefault()
+    
     try {
       // Make sure isEdited property is included in the update
-      const contactToUpdate = {...submitData, isEdited: true}
+      const contactToUpdate = {...formData, isEdited: true}
       const response = await apiService.updateContact(editingContact._id, contactToUpdate)
 
       if (response.success) {
@@ -81,13 +129,11 @@ const ContactManagement = () => {
         console.error('API returned error:', response.error)
         toast.error('Failed to update contact')
       }
-      setShowEditForm(false)
-      setEditingContact(null)
+      handleCancelForm()
     } catch (error) {
       console.error('Error updating contact:', error)
       toast.error('Failed to update contact')
-      setShowEditForm(false)
-      setEditingContact(null)
+      handleCancelForm()
     }
   }
 
@@ -149,6 +195,144 @@ const ContactManagement = () => {
       <div className="space-y-6">
       {/* Header */}
 
+      {/* Contact Form */}
+      {showForm && (
+        <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 rounded-2xl shadow-2xl border border-yellow-400/30 backdrop-blur-sm">
+          <div className="p-6 border-b border-yellow-400/30">
+            <h3 className="text-xl font-bold text-yellow-300">
+              Edit Contact
+            </h3>
+          </div>
+          <form onSubmit={handleEditSubmit} className="space-y-6 p-6">
+            {/* Contact Information */}
+            <div className="border-b border-yellow-400/30 pb-6">
+              <h4 className="text-md font-medium text-yellow-300 mb-4">Contact Information</h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">
+                    Name *
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    required
+                    placeholder="Enter full name"
+                    className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">
+                    Email *
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    required
+                    placeholder="Enter email address"
+                    className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                <div>
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">
+                    Phone
+                  </label>
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    placeholder="Enter phone number"
+                    className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">
+                    Subject *
+                  </label>
+                  <input
+                    type="text"
+                    name="subject"
+                    value={formData.subject}
+                    onChange={handleInputChange}
+                    required
+                    placeholder="Enter subject"
+                    className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Message */}
+            <div className="border-b border-yellow-400/30 pb-6">
+              <h4 className="text-md font-medium text-yellow-300 mb-4">Message</h4>
+
+              <div>
+                <label className="block text-sm font-medium text-yellow-300 mb-1">
+                  Message *
+                </label>
+                <textarea
+                  name="message"
+                  value={formData.message}
+                  onChange={handleInputChange}
+                  required
+                  rows={4}
+                  placeholder="Enter message"
+                  className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+                />
+              </div>
+            </div>
+
+            {/* Status */}
+            <div className="border-b border-yellow-400/30 pb-6">
+              <h4 className="text-md font-medium text-yellow-300 mb-4">Status</h4>
+
+              <div>
+                <label className="block text-sm font-medium text-yellow-300 mb-1">
+                  Status
+                </label>
+                <select
+                  name="status"
+                  value={formData.status}
+                  onChange={handleInputChange}
+                  className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+                >
+                  <option value="new">New</option>
+                  <option value="contacted">Contacted</option>
+                  <option value="resolved">Resolved</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Form Actions */}
+            <div className="flex justify-end space-x-4">
+              <button
+                type="button"
+                onClick={handleCancelForm}
+                className="px-6 py-3 border border-yellow-400/30 text-yellow-300 rounded-xl hover:bg-yellow-400/10 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-6 py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-gray-900 rounded-xl hover:from-yellow-300 hover:to-yellow-400 transition-all duration-300"
+              >
+                Update Contact
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {/* Contacts List */}
       <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 rounded-2xl shadow-2xl border border-yellow-400/30 backdrop-blur-sm">
         <div className="px-8 py-6 border-b border-yellow-400/20">
@@ -197,95 +381,6 @@ const ContactManagement = () => {
         </div>
       </div>
       </div>
-
-      {/* Edit Contact Modal */}
-      <GenericModal
-        isOpen={showEditForm}
-        onClose={() => {
-          setShowEditForm(false)
-          setEditingContact(null)
-        }}
-        title="Edit Contact"
-        onSubmit={handleEditSubmit}
-        submitButtonText="Update Contact"
-        sections={[
-          {
-            title: 'Contact Information',
-            fields: [
-              {
-                name: 'name',
-                label: 'Name',
-                type: 'text',
-                required: true,
-                placeholder: 'Enter full name'
-              },
-              {
-                name: 'email',
-                label: 'Email',
-                type: 'email',
-                required: true,
-                placeholder: 'Enter email address'
-              },
-              {
-                name: 'phone',
-                label: 'Phone',
-                type: 'tel',
-                placeholder: 'Enter phone number'
-              },
-              {
-                name: 'subject',
-                label: 'Subject',
-                type: 'text',
-                required: true,
-                placeholder: 'Enter subject'
-              }
-            ]
-          },
-          {
-            title: 'Message',
-            fields: [
-              {
-                name: 'message',
-                label: 'Message',
-                type: 'textarea',
-                required: true,
-                placeholder: 'Enter message',
-                rows: 4
-              }
-            ]
-          },
-          {
-            title: 'Status',
-            fields: [
-              {
-                name: 'status',
-                label: 'Status',
-                type: 'select',
-                options: [
-                  { value: 'new', label: 'New' },
-                  { value: 'contacted', label: 'Contacted' },
-                  { value: 'resolved', label: 'Resolved' }
-                ]
-              }
-            ]
-          }
-        ]}
-        initialData={editingContact ? {
-          name: editingContact.name,
-          email: editingContact.email,
-          phone: editingContact.phone || '',
-          subject: editingContact.subject,
-          message: editingContact.message,
-          status: editingContact.status
-        } : {
-          name: '',
-          email: '',
-          phone: '',
-          subject: '',
-          message: '',
-          status: 'new'
-        }}
-      />
     </>
   )
 }

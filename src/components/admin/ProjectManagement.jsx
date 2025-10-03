@@ -2,19 +2,63 @@ import React, { useState, useEffect } from 'react'
 import { toast } from 'react-hot-toast'
 import apiService from '../../services/api'
 import GenericCard from './GenericCard'
-import GenericModal from './GenericModal'
 
 const ProjectManagement = () => {
   const [projects, setProjects] = useState([])
   // No search/filters in admin project listing; show all projects
-  const [showModal, setShowModal] = useState(false)
+  const [showForm, setShowForm] = useState(false)
   const [editingProject, setEditingProject] = useState(null)
   const [loading, setLoading] = useState(false)
   const [publishingId, setPublishingId] = useState(null)
+  const [formData, setFormData] = useState({
+    name: '',
+    location: '',
+    project_types: '',
+    bedrooms: '',
+    area: '',
+    description: '',
+    total_units: '',
+    project_statuses: 'planned',
+    launch_date: '',
+    completion_date: '',
+    published: true
+  })
 
   useEffect(() => {
     fetchProjects()
   }, [])
+
+  useEffect(() => {
+    if (editingProject) {
+      setFormData({
+        name: editingProject.name || editingProject.title || '',
+        location: editingProject.location || '',
+        project_types: editingProject.project_types || editingProject.project_type || '',
+        bedrooms: editingProject.bedrooms || '',
+        area: editingProject.area || '',
+        description: editingProject.description || '',
+        total_units: editingProject.total_units || '',
+        project_statuses: editingProject.project_statuses || editingProject.status || 'planned',
+        launch_date: editingProject.launch_date || '',
+        completion_date: editingProject.completion_date || '',
+        published: editingProject.published !== false
+      })
+    } else {
+      setFormData({
+        name: '',
+        location: '',
+        project_types: '',
+        bedrooms: '',
+        area: '',
+        description: '',
+        total_units: '',
+        project_statuses: 'planned',
+        launch_date: '',
+        completion_date: '',
+        published: true
+      })
+    }
+  }, [editingProject])
 
   const fetchProjects = async () => {
     try {
@@ -51,7 +95,8 @@ const ProjectManagement = () => {
     }
   }
 
-  const handleSubmit = async (formData) => {
+  const handleSubmit = async (e) => {
+    e.preventDefault()
     try {
       const submitData = {
         name: formData.name,
@@ -82,7 +127,7 @@ const ProjectManagement = () => {
 
       if (response && response.success) {
         toast.success(editingProject ? 'Project updated successfully' : 'Project created successfully')
-        setShowModal(false)
+        setShowForm(false)
         setEditingProject(null)
         fetchProjects() // Refresh the list
       } else {
@@ -139,7 +184,20 @@ const ProjectManagement = () => {
 
   const handleEdit = (project) => {
     setEditingProject(project)
-    setShowModal(true)
+    setShowForm(true)
+  }
+
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }))
+  }
+
+  const handleCancelForm = () => {
+    setShowForm(false)
+    setEditingProject(null)
   }
 
   const handleDelete = async (projectId) => {
@@ -227,142 +285,6 @@ const ProjectManagement = () => {
     })
   }
 
-  const modalConfig = {
-    title: editingProject ? 'Edit Project' : 'Add New Project',
-    sections: [
-      {
-        title: 'Basic Information',
-        fields: [
-          {
-            name: 'name',
-            label: 'Project Name',
-            type: 'text',
-            required: true,
-            placeholder: 'Enter project name'
-          },
-          {
-            name: 'location',
-            label: 'Location',
-            type: 'text',
-            required: true,
-            placeholder: 'Enter project location'
-          },
-          {
-            name: 'description',
-            label: 'Description',
-            type: 'textarea',
-            placeholder: 'Brief description about the project'
-          }
-        ]
-      },
-      {
-        title: 'Project Details',
-        fields: [
-          {
-            name: 'project_types',
-            label: 'Project Type',
-            type: 'select',
-            options: [
-              { value: '', label: 'Select Type' },
-              { value: 'Apartment', label: 'Apartment' },
-              { value: 'Villa', label: 'Villa' },
-              { value: 'Townhouse', label: 'Townhouse' },
-              { value: 'Penthouse', label: 'Penthouse' },
-              { value: 'Studio', label: 'Studio' }
-            ]
-          },
-          {
-            name: 'bedrooms',
-            label: 'Bedrooms',
-            type: 'number',
-            min: 0,
-            placeholder: 'Number of bedrooms'
-          },
-          {
-            name: 'area',
-            label: 'Area (sqft)',
-            type: 'text',
-            placeholder: 'e.g. 1200 sqft'
-          },
-          {
-            name: 'total_units',
-            label: 'Total Units',
-            type: 'number',
-            min: 0,
-            placeholder: 'Total number of units'
-          }
-        ]
-      },
-      {
-        title: 'Status & Timeline',
-        fields: [
-          {
-            name: 'project_statuses',
-            label: 'Project Status',
-            type: 'select',
-            options: [
-              { value: 'planned', label: 'Planned' },
-              { value: 'ongoing', label: 'Ongoing' },
-              { value: 'completed', label: 'Completed' },
-              { value: 'cancelled', label: 'Cancelled' }
-            ]
-          },
-          {
-            name: 'launch_date',
-            label: 'Launch Date',
-            type: 'date'
-          },
-          {
-            name: 'completion_date',
-            label: 'Completion Date',
-            type: 'date'
-          }
-        ]
-      },
-      {
-        title: 'Publishing Options',
-        fields: [
-          {
-            name: 'published',
-            label: 'Publish immediately',
-            type: 'checkbox'
-          }
-        ]
-      }
-    ]
-  }
-
-  const getInitialData = () => {
-    if (editingProject) {
-      return {
-        name: editingProject.name || editingProject.title || '',
-        location: editingProject.location || '',
-        project_types: editingProject.project_types || editingProject.project_type || '',
-        bedrooms: editingProject.bedrooms || '',
-        area: editingProject.area || '',
-        description: editingProject.description || '',
-        total_units: editingProject.total_units || '',
-        project_statuses: editingProject.project_statuses || editingProject.status || 'planned',
-        launch_date: editingProject.launch_date || '',
-        completion_date: editingProject.completion_date || '',
-        published: editingProject.published !== false
-      }
-    }
-    return {
-      name: '',
-      location: '',
-      project_types: '',
-      bedrooms: '',
-      area: '',
-      description: '',
-      total_units: '',
-      project_statuses: 'planned',
-      launch_date: '',
-      completion_date: '',
-      published: true
-    }
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -372,23 +294,115 @@ const ProjectManagement = () => {
   }
 
   return (
-    <>
-      {/* Generic Modal for Add/Edit */}
-      <GenericModal
-        isOpen={showModal}
-        onClose={() => {
-          setShowModal(false)
-          setEditingProject(null)
-        }}
-        title={editingProject ? 'Edit Project' : 'Add New Project'}
-        onSubmit={handleSubmit}
-        submitButtonText={editingProject ? 'Update Project' : 'Create Project'}
-        sections={modalConfig.sections}
-        initialData={getInitialData()}
-      />
+    <div className="space-y-6">
+      {/* Project Form */}
+      {showForm && (
+        <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 rounded-2xl shadow-2xl border border-yellow-400/30 backdrop-blur-sm">
+          <div className="p-6 border-b border-yellow-400/30">
+            <h3 className="text-xl font-bold text-yellow-300">{editingProject ? 'Edit Project' : 'Add New Project'}</h3>
+          </div>
+          <form onSubmit={handleSubmit} className="space-y-6 p-6">
+            {/* Basic Information */}
+            <div className="border-b border-yellow-400/30 pb-6">
+              <h4 className="text-md font-medium text-yellow-300 mb-4">Basic Information</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">Project Name *</label>
+                  <input type="text" name="name" required value={formData.name} onChange={handleChange} className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">Location *</label>
+                  <input type="text" name="location" required value={formData.location} onChange={handleChange} className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100" />
+                </div>
+              </div>
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-yellow-300 mb-1">Description</label>
+                <textarea name="description" rows={4} value={formData.description} onChange={handleChange} className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100" />
+              </div>
+            </div>
 
-      <div className="space-y-6">
-        {/* Projects List */}
+            {/* Project Details */}
+            <div className="border-b border-yellow-400/30 pb-6">
+              <h4 className="text-md font-medium text-yellow-300 mb-4">Project Details</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">Project Type</label>
+                  <select name="project_types" value={formData.project_types} onChange={handleChange} className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-400">
+                    <option value="">Select Type</option>
+                    <option value="Apartment">Apartment</option>
+                    <option value="Villa">Villa</option>
+                    <option value="Townhouse">Townhouse</option>
+                    <option value="Penthouse">Penthouse</option>
+                    <option value="Studio">Studio</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">Bedrooms</label>
+                  <input type="number" name="bedrooms" min="0" value={formData.bedrooms} onChange={handleChange} className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">Area (sqft)</label>
+                  <input type="text" name="area" value={formData.area} onChange={handleChange} className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">Total Units</label>
+                  <input type="number" name="total_units" min="0" value={formData.total_units} onChange={handleChange} className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100" />
+                </div>
+              </div>
+            </div>
+
+            {/* Status & Timeline */}
+            <div className="border-b border-yellow-400/30 pb-6">
+              <h4 className="text-md font-medium text-yellow-300 mb-4">Status & Timeline</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">Project Status</label>
+                  <select name="project_statuses" value={formData.project_statuses} onChange={handleChange} className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 focus:outline-none focus:ring-2 focus:ring-yellow-400">
+                    <option value="planned">Planned</option>
+                    <option value="ongoing">Ongoing</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">Launch Date</label>
+                  <input type="date" name="launch_date" value={formData.launch_date} onChange={handleChange} className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">Completion Date</label>
+                  <input type="date" name="completion_date" value={formData.completion_date} onChange={handleChange} className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100" />
+                </div>
+              </div>
+            </div>
+
+            {/* Publishing Options */}
+            <div className="border-b border-yellow-400/30 pb-6">
+              <h4 className="text-md font-medium text-yellow-300 mb-4">Publishing Options</h4>
+              <div className="flex items-center space-x-3">
+                <input
+                  type="checkbox"
+                  id="published"
+                  name="published"
+                  checked={formData.published}
+                  onChange={handleChange}
+                  className="w-5 h-5 text-yellow-400 bg-gray-900 border-yellow-400/30 rounded focus:ring-yellow-400 focus:ring-2"
+                />
+                <label htmlFor="published" className="text-sm font-medium text-yellow-300 cursor-pointer">
+                  Publish immediately
+                </label>
+              </div>
+            </div>
+
+            {/* Form Actions */}
+            <div className="flex justify-end space-x-4">
+              <button type="button" onClick={handleCancelForm} className="px-6 py-3 border border-yellow-400/30 text-yellow-300 rounded-xl hover:bg-yellow-400/10 transition-colors">Cancel</button>
+              <button type="submit" className="px-6 py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-gray-900 rounded-xl hover:from-yellow-300 hover:to-yellow-400 transition-all duration-300">{editingProject ? 'Update Project' : 'Create Project'}</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Projects List */}
       <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 rounded-2xl shadow-2xl border border-yellow-400/30 backdrop-blur-sm">
         <div className="px-8 py-6 border-b border-yellow-400/20">
           <div className="flex items-center justify-between">
@@ -401,7 +415,7 @@ const ProjectManagement = () => {
               <h3 className="text-2xl font-bold bg-gradient-to-r from-yellow-400 to-yellow-200 bg-clip-text text-transparent">All Projects ({projects.length})</h3>
             </div>
             <button
-              onClick={() => setShowModal(true)}
+              onClick={() => setShowForm(true)}
               className="flex items-center space-x-2 bg-gradient-to-r from-yellow-400 to-yellow-500 text-gray-900 px-4 py-2 rounded-lg hover:from-yellow-300 hover:to-yellow-400 transition-all duration-300 font-medium shadow-md hover:shadow-lg"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -450,9 +464,7 @@ const ProjectManagement = () => {
         </div>
       </div>
     </div>
-  </>
-)
-
+  )
 }
 
 export default ProjectManagement

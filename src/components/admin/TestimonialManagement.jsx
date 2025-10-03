@@ -2,17 +2,71 @@ import React, { useState, useEffect } from 'react'
 import { toast } from 'react-hot-toast'
 import apiService, { API_CONFIG } from '../../services/api'
 import GenericCard from './GenericCard'
-import GenericModal from './GenericModal'
 
 const TestimonialManagement = () => {
   const [testimonials, setTestimonials] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingTestimonial, setEditingTestimonial] = useState(null)
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    designation: '',
+    comments: '',
+    image: null,
+    published: true
+  })
 
   useEffect(() => {
     fetchTestimonials()
   }, [])
+
+  useEffect(() => {
+    if (editingTestimonial) {
+      setFormData({
+        name: editingTestimonial.name || '',
+        email: editingTestimonial.email || '',
+        designation: editingTestimonial.designation || '',
+        comments: editingTestimonial.comments || '',
+        image: null,
+        published: editingTestimonial.published !== false
+      })
+    } else {
+      setFormData({
+        name: '',
+        email: '',
+        designation: '',
+        comments: '',
+        image: null,
+        published: true
+      })
+    }
+  }, [editingTestimonial])
+
+  const handleInputChange = (e) => {
+    const { name, value, type, checked, files } = e.target
+    
+    if (type === 'file') {
+      setFormData(prev => ({ ...prev, [name]: files[0] }))
+    } else if (type === 'checkbox') {
+      setFormData(prev => ({ ...prev, [name]: checked }))
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }))
+    }
+  }
+
+  const handleCancelForm = () => {
+    setShowForm(false)
+    setEditingTestimonial(null)
+    setFormData({
+      name: '',
+      email: '',
+      designation: '',
+      comments: '',
+      image: null,
+      published: true
+    })
+  }
 
   const fetchTestimonials = async () => {
     try {
@@ -60,16 +114,18 @@ const TestimonialManagement = () => {
     }
   ]
 
-  const handleSubmit = async (submitData) => {
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    
     try {
       let response
       const formDataToSend = new FormData()
       
-      Object.keys(submitData).forEach(key => {
-        if (key === 'image' && submitData[key]) {
-          formDataToSend.append('image', submitData[key])
+      Object.keys(formData).forEach(key => {
+        if (key === 'image' && formData[key]) {
+          formDataToSend.append('image', formData[key])
         } else if (key !== 'image') {
-          formDataToSend.append(key, submitData[key])
+          formDataToSend.append(key, formData[key])
         }
       })
 
@@ -81,9 +137,7 @@ const TestimonialManagement = () => {
 
       if (response && response.success) {
         toast.success(`Testimonial ${editingTestimonial ? 'updated' : 'created'} successfully`)
-        setShowForm(false)
-        setEditingTestimonial(null)
-        resetForm()
+        handleCancelForm()
         // notify other parts of the app to refresh testimonials
         window.dispatchEvent(new CustomEvent('testimonialsUpdated'))
         fetchTestimonials()
@@ -97,22 +151,20 @@ const TestimonialManagement = () => {
           if (editingTestimonial) {
             setTestimonials(prev => prev.map(testimonial => 
               testimonial._id === editingTestimonial._id 
-                ? { ...editingTestimonial, ...submitData, image: submitData.image ? URL.createObjectURL(submitData.image) : editingTestimonial.image }
+                ? { ...editingTestimonial, ...formData, image: formData.image ? URL.createObjectURL(formData.image) : editingTestimonial.image }
                 : testimonial
             ))
           } else {
             const newTestimonial = {
               _id: Date.now().toString(),
-              ...submitData,
-              image: submitData.image ? URL.createObjectURL(submitData.image) : null,
+              ...formData,
+              image: formData.image ? URL.createObjectURL(formData.image) : null,
               createdAt: new Date().toISOString()
             }
             setTestimonials(prev => [newTestimonial, ...prev])
           }
         }
-        setShowForm(false)
-        setEditingTestimonial(null)
-        resetForm()
+        handleCancelForm()
       }
     } catch (error) {
       console.error('Error saving testimonial:', error)
@@ -198,10 +250,6 @@ const TestimonialManagement = () => {
     }
   }
 
-  const resetForm = () => {
-    // Form data is now handled by GenericModal
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -211,98 +259,145 @@ const TestimonialManagement = () => {
   }
 
   return (
-    <>
-      {/* Testimonial Modal */}
-      <GenericModal
-        isOpen={showForm}
-        onClose={() => {
-          setShowForm(false)
-          setEditingTestimonial(null)
-          resetForm()
-        }}
-        title={editingTestimonial ? 'Edit Testimonial' : 'Add New Testimonial'}
-        onSubmit={handleSubmit}
-        submitButtonText={editingTestimonial ? 'Update Testimonial' : 'Create Testimonial'}
-        sections={[
-          {
-            title: 'Basic Information',
-            fields: [
-              {
-                name: 'name',
-                label: 'Name',
-                type: 'text',
-                required: true,
-                placeholder: 'Enter full name'
-              },
-              {
-                name: 'email',
-                label: 'Email',
-                type: 'email',
-                required: true,
-                placeholder: 'Enter email address'
-              },
-              {
-                name: 'designation',
-                label: 'Designation',
-                type: 'text',
-                placeholder: 'e.g. CEO, Marketing Manager, etc.'
-              }
-            ]
-          },
-          {
-            title: 'Testimonial Content',
-            fields: [
-              {
-                name: 'comments',
-                label: 'Comments',
-                type: 'textarea',
-                required: true,
-                placeholder: 'Write the testimonial comments here...',
-                rows: 6
-              }
-            ]
-          },
-          {
-            title: 'Profile Image',
-            fields: [
-              {
-                name: 'image',
-                label: 'Upload Image',
-                type: 'file',
-                accept: 'image/*'
-              }
-            ]
-          },
-          {
-            title: 'Publishing Options',
-            fields: [
-              {
-                name: 'published',
-                label: 'Publish immediately',
-                type: 'checkbox'
-              }
-            ]
-          }
-        ]}
-        initialData={editingTestimonial ? {
-          name: editingTestimonial.name,
-          email: editingTestimonial.email,
-          comments: editingTestimonial.comments,
-          designation: editingTestimonial.designation || '',
-          image: null,
-          published: editingTestimonial.published !== false
-        } : {
-          name: '',
-          email: '',
-          comments: '',
-          image: null,
-          designation: '',
-          published: true
-        }}
-      />
+    <div className="space-y-6">
+      {/* Testimonial Form */}
+      {showForm && (
+        <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 rounded-2xl shadow-2xl border border-yellow-400/30 backdrop-blur-sm">
+          <div className="p-6 border-b border-yellow-400/30">
+            <h3 className="text-xl font-bold text-yellow-300">
+              {editingTestimonial ? 'Edit Testimonial' : 'Add New Testimonial'}
+            </h3>
+          </div>
+          <form onSubmit={handleSubmit} className="space-y-6 p-6">
+            {/* Basic Information */}
+            <div className="border-b border-yellow-400/30 pb-6">
+              <h4 className="text-md font-medium text-yellow-300 mb-4">Basic Information</h4>
 
-      <div className="space-y-6">
-        {/* Testimonials List */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">
+                    Name *
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    required
+                    placeholder="Enter full name"
+                    className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-yellow-300 mb-1">
+                    Email *
+                  </label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    required
+                    placeholder="Enter email address"
+                    className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-yellow-300 mb-1">
+                  Designation
+                </label>
+                <input
+                  type="text"
+                  name="designation"
+                  value={formData.designation}
+                  onChange={handleInputChange}
+                  placeholder="e.g. CEO, Marketing Manager, etc."
+                  className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+                />
+              </div>
+            </div>
+
+            {/* Testimonial Content */}
+            <div className="border-b border-yellow-400/30 pb-6">
+              <h4 className="text-md font-medium text-yellow-300 mb-4">Testimonial Content</h4>
+
+              <div>
+                <label className="block text-sm font-medium text-yellow-300 mb-1">
+                  Comments *
+                </label>
+                <textarea
+                  name="comments"
+                  value={formData.comments}
+                  onChange={handleInputChange}
+                  required
+                  rows={6}
+                  placeholder="Write the testimonial comments here..."
+                  className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 placeholder-yellow-300/50 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-300 backdrop-blur-sm"
+                />
+              </div>
+            </div>
+
+            {/* Profile Image */}
+            <div className="border-b border-yellow-400/30 pb-6">
+              <h4 className="text-md font-medium text-yellow-300 mb-4">Profile Image</h4>
+
+              <div>
+                <label className="block text-sm font-medium text-yellow-300 mb-1">
+                  Upload Image
+                </label>
+                <input
+                  type="file"
+                  name="image"
+                  onChange={handleInputChange}
+                  accept="image/*"
+                  className="w-full bg-gray-900/50 border border-yellow-400/30 rounded-xl px-4 py-3 text-yellow-100 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-yellow-400 file:text-gray-900 hover:file:bg-yellow-300 transition-all duration-300 backdrop-blur-sm"
+                />
+              </div>
+            </div>
+
+            {/* Publishing Options */}
+            <div className="border-b border-yellow-400/30 pb-6">
+              <h4 className="text-md font-medium text-yellow-300 mb-4">Publishing Options</h4>
+
+              <div className="flex items-center space-x-3">
+                <input
+                  type="checkbox"
+                  id="published"
+                  name="published"
+                  checked={formData.published}
+                  onChange={handleInputChange}
+                  className="w-5 h-5 text-yellow-400 bg-gray-900 border-yellow-400/30 rounded focus:ring-yellow-400 focus:ring-2"
+                />
+                <label htmlFor="published" className="text-sm font-medium text-yellow-300 cursor-pointer">
+                  Publish immediately
+                </label>
+              </div>
+            </div>
+
+            {/* Form Actions */}
+            <div className="flex justify-end space-x-4">
+              <button
+                type="button"
+                onClick={handleCancelForm}
+                className="px-6 py-3 border border-yellow-400/30 text-yellow-300 rounded-xl hover:bg-yellow-400/10 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-6 py-3 bg-gradient-to-r from-yellow-400 to-yellow-500 text-gray-900 rounded-xl hover:from-yellow-300 hover:to-yellow-400 transition-all duration-300"
+              >
+                {editingTestimonial ? 'Update Testimonial' : 'Create Testimonial'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Testimonials List */}
       <div className="bg-gradient-to-br from-gray-800/80 to-gray-900/80 rounded-2xl shadow-2xl border border-yellow-400/30 backdrop-blur-sm">
         <div className="px-8 py-6 border-b border-yellow-400/20">
           <div className="flex items-center justify-between">
@@ -362,8 +457,7 @@ const TestimonialManagement = () => {
         </div>
       </div>
     </div>
-  </>
-)
+  )
 
 }
 
